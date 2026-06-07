@@ -1,21 +1,16 @@
 # AHRM Options Arbitrage Scanner
 
-Go monolith for AHRM options arbitrage scanning and market indicators.
-
-## Phase 1: Project Skeleton
-
-Phase 1 provides configuration loading, logging, health/readiness endpoints, optional Supabase PostgreSQL connectivity, and a minimal SQL migration runner (`schema_migrations` only).
+Go monolith for AHRM (`اهرم`) options arbitrage, market indicators, dashboard, and Telegram alerts.
 
 ## Requirements
 
 - Go 1.22+
-- Optional: Supabase PostgreSQL credentials in a local `.env` file
+- `.env` file (see `.env.example`)
 
 ## Setup
 
 ```bash
 cp .env.example .env
-# Edit .env when you are ready to connect Supabase
 go mod tidy
 ```
 
@@ -23,30 +18,42 @@ go mod tidy
 
 ```bash
 make run
-# or
-go run ./cmd/server
 ```
 
 ## Test
 
 ```bash
 make test
-```
-
-Integration DB test (skipped without Supabase env):
-
-```bash
-make test-integration
+make test-integration   # requires Supabase .env
 ```
 
 ## Endpoints
 
-- `GET /health` — always returns `{"status":"ok"}`
-- `GET /ready` — readiness report; returns `503` if DB pool exists but ping fails
+| Path | Description |
+|------|-------------|
+| `GET /health` | Liveness (no external deps) |
+| `GET /ready` | Readiness + Supabase status |
+| `GET /dashboard` | Main dashboard |
+| `GET /arbitrage` | Arbitrage opportunities |
+| `GET /hv` | Historical volatility |
+| `GET /market` | Breadth & Advance/Decline |
+| `GET /matrix` | Call/Put option matrices |
 
-## Manual checks
+## Business symbols
 
-```bash
-curl -s http://localhost:8080/health
-curl -s http://localhost:8080/ready
-```
+- Underlying: `اهرم`
+- Calls: `ضهرم`
+- Puts: `طهرم`
+
+## Phases implemented
+
+1. Skeleton, config, health, Supabase migrations
+2. SourceArena client + raw response storage
+3. Option pair matching (>30 days to expiry)
+4. Arbitrage engine (R formula)
+5. HV engine (40 trading days)
+6. Breadth Thrust (10-day avg)
+7. Advance/Decline ratio (10-day avg)
+8. Call/Put matrices
+9. HTML dashboard
+10. Telegram alerts with duplicate prevention
