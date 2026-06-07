@@ -16,6 +16,15 @@ type Config struct {
 	Supabase    SupabaseConfig
 	SourceArena SourceArenaConfig
 	Telegram    TelegramConfig
+	Alerts      AlertsConfig
+}
+
+type AlertsConfig struct {
+	ArbitrageRThreshold  float64
+	BreadthHighThreshold float64
+	BreadthLowThreshold  float64
+	AdvanceHighThreshold float64
+	AdvanceLowThreshold  float64
 }
 
 type SupabaseConfig struct {
@@ -109,6 +118,13 @@ func LoadFromEnv() (*Config, error) {
 		Telegram: TelegramConfig{
 			BotToken: strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN")),
 			ChatID:   strings.TrimSpace(os.Getenv("TELEGRAM_CHAT_ID")),
+		},
+		Alerts: AlertsConfig{
+			ArbitrageRThreshold:  parseFloatEnv("ALERT_ARBITRAGE_R_THRESHOLD", 0),
+			BreadthHighThreshold: parseFloatEnv("ALERT_BREADTH_HIGH", 0.618),
+			BreadthLowThreshold:  parseFloatEnv("ALERT_BREADTH_LOW", 0.4),
+			AdvanceHighThreshold: parseFloatEnv("ALERT_ADVANCE_HIGH", 2.0),
+			AdvanceLowThreshold:  parseFloatEnv("ALERT_ADVANCE_LOW", 0.8),
 		},
 	}
 	return cfg, cfg.Validate()
@@ -206,4 +222,16 @@ func anyNonEmpty(values ...string) bool {
 		}
 	}
 	return false
+}
+
+func parseFloatEnv(key string, fallback float64) float64 {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	var value float64
+	if _, err := fmt.Sscanf(raw, "%f", &value); err != nil {
+		return fallback
+	}
+	return value
 }
