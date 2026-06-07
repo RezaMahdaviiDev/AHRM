@@ -7,6 +7,7 @@ import (
 
 	"ahrm/internal/config"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -25,6 +26,8 @@ func Connect(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	poolCfg.MaxConns = 5
 	poolCfg.MinConns = 1
 	poolCfg.MaxConnLifetime = 30 * time.Minute
+	// Supabase transaction pooler (port 6543) does not support prepared statements.
+	poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -60,8 +61,34 @@ func (t TelegramConfig) Configured() bool {
 }
 
 func Load() (*Config, error) {
-	_ = godotenv.Load()
+	loadEnvFiles()
 	return LoadFromEnv()
+}
+
+func loadEnvFiles() {
+	_ = godotenv.Load()
+	if os.Getenv("SUPABASE_DB_HOST") != "" {
+		return
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	for {
+		envPath := filepath.Join(dir, ".env")
+		if _, statErr := os.Stat(envPath); statErr == nil {
+			_ = godotenv.Load(envPath)
+			return
+		}
+		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
+			return
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return
+		}
+		dir = parent
+	}
 }
 
 func LoadFromEnv() (*Config, error) {

@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -11,13 +10,9 @@ import (
 )
 
 func TestDatabaseConnection(t *testing.T) {
-	if os.Getenv("SUPABASE_DB_HOST") == "" {
-		t.Skip("SUPABASE_DB_HOST not set; skipping integration test")
-	}
-
-	cfg, err := config.LoadFromEnv()
+	cfg, err := config.Load()
 	if err != nil {
-		t.Fatalf("LoadFromEnv() error = %v", err)
+		t.Fatalf("Load() error = %v", err)
 	}
 	if !cfg.Supabase.Configured() {
 		t.Skip("supabase not fully configured; skipping integration test")
