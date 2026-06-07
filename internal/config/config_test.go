@@ -96,12 +96,24 @@ func TestReadinessReportUnconfigured(t *testing.T) {
 	}
 }
 
-func TestValidatePartialTelegramFails(t *testing.T) {
+func TestValidateChatWithoutTokenFails(t *testing.T) {
 	cfg := &config.Config{
-		Telegram: config.TelegramConfig{BotToken: "token", ChatID: ""},
+		Telegram: config.TelegramConfig{ChatID: "123"},
 	}
 	if err := cfg.Validate(); err == nil {
-		t.Fatal("expected validation error for partial telegram config")
+		t.Fatal("expected validation error when chat id set without token")
+	}
+}
+
+func TestValidateTokenWithoutChatOK(t *testing.T) {
+	cfg := &config.Config{
+		Telegram: config.TelegramConfig{BotToken: "token"},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+	if cfg.Telegram.Configured() {
+		t.Fatal("expected telegram not fully configured without chat id")
 	}
 }
 

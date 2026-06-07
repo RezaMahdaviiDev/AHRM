@@ -31,7 +31,14 @@
       <p>A/D 10d: {{printf "%.4f" .Snapshot.AdvanceDecline.Average10Day}} ({{.Snapshot.AdvanceDecline.AlertState}})</p>
       <p>آربیتراژ: {{len .Snapshot.Opportunities}}</p>
     </div>
-    {{if .Snapshot.Errors}}<div class="card">{{range .Snapshot.Errors}}<div>{{.}}</div>{{end}}</div>{{end}}
+    {{if .Snapshot.Errors}}
+    <div class="card" style="border:1px solid #f87171;color:#fecaca">
+      <strong>خطا در دریافت داده از SourceArena</strong>
+      <p>سرور فعلی (خارج از ایران) به API بورس (<code>sourcearena.ir</code>) دسترسی شبکه‌ای ندارد.</p>
+      <p><strong>راه‌حل:</strong> اجرای برنامه روی VPS ایران، یا تنظیم <code>SOURCEARENA_HTTP_PROXY</code> در <code>.env</code> با پروکسی ایرانی.</p>
+      {{range .Snapshot.Errors}}<div style="font-size:12px;margin-top:6px">{{.}}</div>{{end}}
+    </div>
+    {{end}}
   </main>
 </body>
 </html>

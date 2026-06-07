@@ -37,7 +37,8 @@ type SupabaseConfig struct {
 }
 
 type SourceArenaConfig struct {
-	APIToken string
+	APIToken  string
+	HTTPProxy string
 }
 
 type TelegramConfig struct {
@@ -66,7 +67,7 @@ func (s SourceArenaConfig) Configured() bool {
 }
 
 func (t TelegramConfig) Configured() bool {
-	return anyNonEmpty(t.BotToken, t.ChatID)
+	return strings.TrimSpace(t.BotToken) != "" && strings.TrimSpace(t.ChatID) != ""
 }
 
 func Load() (*Config, error) {
@@ -113,7 +114,8 @@ func LoadFromEnv() (*Config, error) {
 			SSLMode:  strings.TrimSpace(os.Getenv("SUPABASE_DB_SSLMODE")),
 		},
 		SourceArena: SourceArenaConfig{
-			APIToken: strings.TrimSpace(os.Getenv("SOURCEARENA_API_TOKEN")),
+			APIToken:  strings.TrimSpace(os.Getenv("SOURCEARENA_API_TOKEN")),
+			HTTPProxy: strings.TrimSpace(os.Getenv("SOURCEARENA_HTTP_PROXY")),
 		},
 		Telegram: TelegramConfig{
 			BotToken: strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN")),
@@ -146,11 +148,17 @@ func (c *Config) Validate() error {
 	}); err != nil {
 		return err
 	}
-	if err := validateGroup("telegram", c.Telegram.Configured(), map[string]string{
-		"TELEGRAM_BOT_TOKEN": c.Telegram.BotToken,
-		"TELEGRAM_CHAT_ID":   c.Telegram.ChatID,
-	}); err != nil {
+	if err := c.validateTelegram(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (c *Config) validateTelegram() error {
+	hasToken := strings.TrimSpace(c.Telegram.BotToken) != ""
+	hasChat := strings.TrimSpace(c.Telegram.ChatID) != ""
+	if hasChat && !hasToken {
+		return fmt.Errorf("telegram: TELEGRAM_BOT_TOKEN is required when TELEGRAM_CHAT_ID is set")
 	}
 	return nil
 }

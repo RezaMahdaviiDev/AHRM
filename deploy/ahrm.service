@@ -1,0 +1,17 @@
+[Unit]
+Description=AHRM Options Arbitrage Scanner
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/AHRM
+EnvironmentFile=/root/AHRM/.env
+ExecStart=/root/AHRM/bin/server
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/root/AHRM/ahrm-server.log
+StandardError=append:/root/AHRM/ahrm-server.log
+
+[Install]
+WantedBy=multi-user.target

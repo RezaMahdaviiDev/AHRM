@@ -31,12 +31,19 @@ type RawStore interface {
 }
 
 func NewClient(cfg config.SourceArenaConfig, store RawStore) *Client {
+	transport := &http.Transport{}
+	if cfg.HTTPProxy != "" {
+		if proxyURL, err := url.Parse(cfg.HTTPProxy); err == nil {
+			transport.Proxy = http.ProxyURL(proxyURL)
+		}
+	}
 	return &Client{
 		token:  cfg.APIToken,
 		v1Base: defaultV1Base,
 		v2Base: defaultV2Base,
 		httpClient: &http.Client{
-			Timeout: 45 * time.Second,
+			Timeout:   90 * time.Second,
+			Transport: transport,
 		},
 		store: store,
 	}
