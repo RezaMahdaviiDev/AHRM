@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head><meta charset="UTF-8"><title>Matrix | AHRM</title>
+<style>table{border-collapse:collapse}td,th{border:1px solid #555;padding:.3rem;font-size:12px}</style></head>
+<body style="font-family:Tahoma;background:#0f172a;color:#e2e8f0">
+<a href="/dashboard">داشبورد</a>
+<h1>Call Matrix (ضهرم)</h1>
+{{template "matrixTable" .Snapshot.CallMatrix}}
+<h1>Put Matrix (طهرم)</h1>
+{{template "matrixTable" .Snapshot.PutMatrix}}
+</body></html>
+{{define "matrixTable"}}
+<table><tr><th></th>{{range .Symbols}}<th>{{.}}</th>{{end}}</tr>
+{{range $i,$row := .Cells}}<tr><th>{{index $.Symbols $i}}</th>{{range $row}}<td>{{printf "%.0f" .}}</td>{{end}}</tr>{{end}}
+</table>
+{{end}}

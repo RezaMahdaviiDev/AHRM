@@ -3,11 +3,14 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"html/template"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"ahrm/internal/config"
+	"ahrm/internal/scanner"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -18,15 +21,22 @@ type Server struct {
 	logger     *slog.Logger
 	migrations string
 	dbReady    bool
+	scanner    *scanner.Service
+	templates  *template.Template
+	tplOnce    sync.Once
+	snapMu     sync.RWMutex
+	snapCache  scanner.Snapshot
+	snapAt     time.Time
 }
 
-func New(cfg *config.Config, pool *pgxpool.Pool, logger *slog.Logger, migrationsDir string, dbReady bool) *Server {
+func New(cfg *config.Config, pool *pgxpool.Pool, logger *slog.Logger, migrationsDir string, dbReady bool, scan *scanner.Service) *Server {
 	return &Server{
 		cfg:        cfg,
 		pool:       pool,
 		logger:     logger,
 		migrations: migrationsDir,
 		dbReady:    dbReady,
+		scanner:    scan,
 	}
 }
 
@@ -34,6 +44,9 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.handleHealth)
 	mux.HandleFunc("GET /ready", s.handleReady)
+	if s.scanner != nil {
+		s.registerPages(mux)
+	}
 	return mux
 }
 

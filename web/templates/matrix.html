@@ -1,0 +1,27 @@
+{{define "content"}}
+<h1>ماتریس اختیار</h1>
+<div class="card">
+  <h3>Call Matrix (ضهرم)</h3>
+  {{template "matrixTable" .Snapshot.CallMatrix}}
+</div>
+<div class="card">
+  <h3>Put Matrix (طهرم)</h3>
+  {{template "matrixTable" .Snapshot.PutMatrix}}
+</div>
+{{end}}
+
+{{define "matrixTable"}}
+<table>
+  <thead>
+    <tr><th></th>{{range .Symbols}}<th>{{.}}</th>{{end}}</tr>
+  </thead>
+  <tbody>
+  {{range $i, $row := .Cells}}
+    <tr>
+      <th>{{index $.Symbols $i}}</th>
+      {{range $j, $val := $row}}<td>{{printf "%.0f" $val}}</td>{{end}}
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}

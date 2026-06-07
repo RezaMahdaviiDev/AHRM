@@ -11,9 +11,14 @@ import (
 	"syscall"
 	"time"
 
+	"ahrm/internal/alerts"
 	"ahrm/internal/config"
 	"ahrm/internal/db"
+	"ahrm/internal/market"
+	"ahrm/internal/scanner"
 	"ahrm/internal/server"
+	"ahrm/internal/sourcearena"
+	"ahrm/internal/telegram"
 )
 
 func main() {
@@ -47,8 +52,31 @@ func main() {
 		}
 	}
 
+	var rawStore sourcearena.RawStore = sourcearena.NopRawStore{}
+	if pool != nil {
+		rawStore = sourcearena.NewPostgresRawStore(pool)
+	}
+	var saClient *sourcearena.Client
+	if cfg.SourceArena.Configured() {
+		saClient = sourcearena.NewClient(cfg.SourceArena, rawStore)
+	}
+
+	var tgSender alerts.TelegramSender
+	if cfg.Telegram.Configured() {
+		tgSender = telegram.NewClient(cfg.Telegram)
+	}
+	alertEngine := alerts.NewEngine(alerts.Config{
+		ArbitrageRThreshold:  cfg.Alerts.ArbitrageRThreshold,
+		BreadthHighThreshold: cfg.Alerts.BreadthHighThreshold,
+		BreadthLowThreshold:  cfg.Alerts.BreadthLowThreshold,
+		AdvanceHighThreshold: cfg.Alerts.AdvanceHighThreshold,
+		AdvanceLowThreshold:  cfg.Alerts.AdvanceLowThreshold,
+	}, tgSender, alerts.NewStore(pool))
+
+	scan := scanner.NewService(cfg, saClient, market.NewStore(pool), alertEngine)
+
 	dbReady := pool != nil
-	srv := server.New(cfg, pool, logger, filepath.Join(projectRoot(), "migrations"), dbReady)
+	srv := server.New(cfg, pool, logger, filepath.Join(projectRoot(), "migrations"), dbReady, scan)
 	logReadiness(logger, srv.ReadinessReport())
 
 	httpServer := &http.Server{

@@ -14,7 +14,7 @@ import (
 
 func TestHealthAlwaysOK(t *testing.T) {
 	cfg := &config.Config{}
-	srv := server.New(cfg, nil, slog.Default(), "migrations", false)
+	srv := server.New(cfg, nil, slog.Default(), "migrations", false, nil)
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
 
@@ -38,7 +38,7 @@ func TestHealthAlwaysOK(t *testing.T) {
 
 func TestReadyWithoutDatabase(t *testing.T) {
 	cfg := &config.Config{}
-	srv := server.New(cfg, nil, slog.Default(), "migrations", false)
+	srv := server.New(cfg, nil, slog.Default(), "migrations", false, nil)
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	rec := httptest.NewRecorder()
 
@@ -63,7 +63,7 @@ func TestReadyUsesReadinessReportFields(t *testing.T) {
 	cfg := &config.Config{
 		SourceArena: config.SourceArenaConfig{APIToken: "token"},
 	}
-	srv := server.New(cfg, nil, slog.Default(), "migrations", false)
+	srv := server.New(cfg, nil, slog.Default(), "migrations", false, nil)
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	rec := httptest.NewRecorder()
 

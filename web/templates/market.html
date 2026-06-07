@@ -1,0 +1,15 @@
+{{define "content"}}
+<h1>شاخص‌های بازار</h1>
+<div class="card">
+  <h3>Breadth Thrust</h3>
+  <p>Current: {{printf "%.4f" .Snapshot.Breadth.CurrentValue}}</p>
+  <p>10-day Avg: {{printf "%.4f" .Snapshot.Breadth.Average10Day}}</p>
+  <p>Alert: <span class="alert-{{.Snapshot.Breadth.AlertState}}">{{.Snapshot.Breadth.AlertState}}</span></p>
+</div>
+<div class="card">
+  <h3>Advance / Decline Ratio</h3>
+  <p>Current: {{printf "%.4f" .Snapshot.AdvanceDecline.CurrentValue}}</p>
+  <p>10-day Avg: {{printf "%.4f" .Snapshot.AdvanceDecline.Average10Day}}</p>
+  <p>Alert: <span class="alert-{{.Snapshot.AdvanceDecline.AlertState}}">{{.Snapshot.AdvanceDecline.AlertState}}</span></p>
+</div>
+{{end}}

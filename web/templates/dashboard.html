@@ -1,0 +1,25 @@
+{{define "content"}}
+<h1>داشبورد AHRM</h1>
+<div class="card">
+  <p>زمان: {{.Snapshot.GeneratedAt.Format "2006-01-02 15:04:05"}} UTC</p>
+  <p>قیمت {{.Snapshot.Underlying.Name}}: {{printf "%.0f" .Snapshot.Underlying.ClosePrice}}</p>
+  <p>HV: {{printf "%.2f" .Snapshot.HV.HVPct}}%</p>
+  <p>Breadth (10d): {{printf "%.4f" .Snapshot.Breadth.Average10Day}} — <span class="alert-{{.Snapshot.Breadth.AlertState}}">{{.Snapshot.Breadth.AlertState}}</span></p>
+  <p>Advance/Decline (10d): {{printf "%.4f" .Snapshot.AdvanceDecline.Average10Day}} — <span class="alert-{{.Snapshot.AdvanceDecline.AlertState}}">{{.Snapshot.AdvanceDecline.AlertState}}</span></p>
+  <p>فرصت‌های آربیتراژ: {{len .Snapshot.Opportunities}}</p>
+</div>
+{{if .Snapshot.Errors}}
+<div class="card errors">
+  <ul>{{range .Snapshot.Errors}}<li>{{.}}</li>{{end}}</ul>
+</div>
+{{end}}
+<canvas id="hvChart" height="120"></canvas>
+<script>
+const hv = {{printf "%.4f" .Snapshot.HV.HVPct}};
+new Chart(document.getElementById('hvChart'), {
+  type: 'bar',
+  data: { labels: ['HV %'], datasets: [{ label: 'Historical Volatility', data: [hv], backgroundColor: '#38bdf8' }] },
+  options: { scales: { y: { beginAtZero: true } } }
+});
+</script>
+{{end}}

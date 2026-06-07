@@ -1,0 +1,18 @@
+{{define "content"}}
+<h1>Historical Volatility (اهرم)</h1>
+<div class="card">
+  <p>HV: {{printf "%.2f" .Snapshot.HV.HVPct}}%</p>
+  <p>Daily Volatility: {{printf "%.6f" .Snapshot.HV.DailyVolatility}}</p>
+  <p>Sample Size: {{.Snapshot.HV.SampleSize}}</p>
+</div>
+<canvas id="hvChart" height="140"></canvas>
+<script>
+new Chart(document.getElementById('hvChart'), {
+  type: 'line',
+  data: {
+    labels: ['Daily Vol', 'HV x15.8'],
+    datasets: [{ label: 'Volatility', data: [{{printf "%.6f" .Snapshot.HV.DailyVolatility}}, {{printf "%.4f" .Snapshot.HV.HVPct}}], borderColor: '#34d399', fill: false }]
+  }
+});
+</script>
+{{end}}

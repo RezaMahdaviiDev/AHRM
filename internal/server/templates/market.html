@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head><meta charset="UTF-8"><title>Market | AHRM</title></head>
+<body style="font-family:Tahoma;background:#0f172a;color:#e2e8f0">
+<a href="/dashboard">داشبورد</a>
+<h1>بازار</h1>
+<p>Breadth avg10: {{printf "%.4f" .Snapshot.Breadth.Average10Day}} alert={{.Snapshot.Breadth.AlertState}}</p>
+<p>A/D avg10: {{printf "%.4f" .Snapshot.AdvanceDecline.Average10Day}} alert={{.Snapshot.AdvanceDecline.AlertState}}</p>
+</body></html>
