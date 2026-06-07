@@ -1,12 +1,64 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
-<head><meta charset="UTF-8"><title>Arbitrage | AHRM</title>
-<style>body{font-family:Tahoma;background:#0f172a;color:#e2e8f0}table{width:100%;border-collapse:collapse}td,th{border:1px solid #334155;padding:.4rem}</style></head>
+<head>
+  <meta charset="UTF-8">
+  <title>{{.Title}} | AHRM</title>
+  <style>
+    body { font-family: Tahoma, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+    header { background: #1e293b; padding: 1rem 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+    header a { color: #93c5fd; text-decoration: none; }
+    main { padding: 1.5rem 2rem; }
+    table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; }
+    td, th { border: 1px solid #334155; padding: 0.5rem 0.75rem; text-align: center; }
+    th { background: #0f172a; }
+    tr:nth-child(even) { background: #172033; }
+    .muted { color: #94a3b8; }
+    .positive { color: #86efac; }
+  </style>
+</head>
 <body>
-<nav><a href="/dashboard">داشبورد</a></nav>
-<h1>آربیتراژ</h1>
-<table>
-<tr><th>سررسید</th><th>اعمال</th><th>R%</th><th>Call</th><th>Put</th></tr>
-{{range .Snapshot.Opportunities}}<tr><td>{{.Expiry}}</td><td>{{printf "%.0f" .Strike}}</td><td>{{printf "%.2f" .ReturnPct}}</td><td>{{printf "%.0f" .CallPrice}}</td><td>{{printf "%.0f" .PutPrice}}</td></tr>{{else}}<tr><td colspan="5">بدون داده</td></tr>{{end}}
-</table>
-</body></html>
+  <header>
+    <strong>AHRM Scanner</strong>
+    <a href="/dashboard">داشبورد</a>
+    <a href="/arbitrage">آربیتراژ</a>
+    <a href="/hv">HV</a>
+    <a href="/market">بازار</a>
+    <a href="/matrix">ماتریس</a>
+  </header>
+  <main>
+    <h1>فرصت‌های آربیتراژ</h1>
+    <p class="muted">
+      زمان: {{.Snapshot.GeneratedAt.Format "2006-01-02 15:04:05"}} UTC |
+      قیمت {{.Snapshot.Underlying.Name}}: {{printf "%.0f" .Snapshot.Underlying.ClosePrice}} |
+      تعداد: {{len .Snapshot.Opportunities}}
+    </p>
+    <table>
+      <tr>
+        <th>سررسید</th>
+        <th>اعمال</th>
+        <th>R%</th>
+        <th>Call</th>
+        <th>Put</th>
+        <th>سرمایه</th>
+      </tr>
+      {{range .Snapshot.Opportunities}}
+      <tr>
+        <td>{{.Expiry}}</td>
+        <td>{{printf "%.0f" .Strike}}</td>
+        <td class="positive">{{printf "%.2f" .ReturnPct}}</td>
+        <td>{{printf "%.0f" .CallPrice}}</td>
+        <td>{{printf "%.0f" .PutPrice}}</td>
+        <td>{{printf "%.0f" .Capital}}</td>
+      </tr>
+      {{else}}
+      <tr><td colspan="6">بدون فرصت آربیتراژ — snapshot در حال بارگذاری است یا جفت call/put واجد شرایط نیست.</td></tr>
+      {{end}}
+    </table>
+    {{if .Snapshot.Errors}}
+    <div class="muted" style="margin-top:1rem">
+      {{range .Snapshot.Errors}}<p>{{.}}</p>{{end}}
+    </div>
+    {{end}}
+  </main>
+</body>
+</html>

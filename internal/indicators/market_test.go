@@ -48,6 +48,33 @@ func TestAdvanceDeclineRatio(t *testing.T) {
 	}
 }
 
+func TestBreadthPartialHistory(t *testing.T) {
+	engine := indicators.NewBreadthEngine(indicators.Thresholds{High: 0.59, Low: 0.4})
+	history := []indicators.DailyMarket{{Positive: 600, Total: 1000, Negative: 400}}
+	result, err := engine.Evaluate(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.CurrentValue != 0.6 {
+		t.Fatalf("current=%v", result.CurrentValue)
+	}
+	if result.Average10Day != 0.6 {
+		t.Fatalf("avg=%v", result.Average10Day)
+	}
+}
+
+func TestAdvanceDeclineNoDecliners(t *testing.T) {
+	engine := indicators.NewAdvanceDeclineEngine(indicators.Thresholds{High: 2.0, Low: 0.8})
+	history := []indicators.DailyMarket{{Positive: 800, Negative: 0, Total: 1000}}
+	result, err := engine.Evaluate(history)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.CurrentValue != 800 {
+		t.Fatalf("current=%v", result.CurrentValue)
+	}
+}
+
 func TestThresholdValidation(t *testing.T) {
 	th := indicators.Thresholds{High: 1.5, Low: 0.5}
 	if th.AlertState(1.6) != "high" {

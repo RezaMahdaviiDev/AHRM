@@ -41,10 +41,14 @@ func AverageLast(values []float64, days int) (float64, error) {
 	if days <= 0 {
 		return 0, fmt.Errorf("days must be positive")
 	}
-	if len(values) < days {
-		return 0, fmt.Errorf("need %d values, got %d", days, len(values))
+	if len(values) == 0 {
+		return 0, fmt.Errorf("need %d values, got 0", days)
 	}
-	slice := values[len(values)-days:]
+	n := days
+	if len(values) < n {
+		n = len(values)
+	}
+	slice := values[len(values)-n:]
 	var sum float64
 	for _, v := range slice {
 		sum += v
@@ -60,10 +64,14 @@ func BreadthDailyValue(day DailyMarket) (float64, error) {
 }
 
 func AdvanceDeclineDailyValue(day DailyMarket) (float64, error) {
-	if day.Negative <= 0 {
-		return 0, fmt.Errorf("negative symbols must be positive")
+	if day.Positive <= 0 && day.Negative <= 0 {
+		return 0, fmt.Errorf("no advancing or declining symbols")
 	}
-	return float64(day.Positive) / float64(day.Negative), nil
+	denom := day.Negative
+	if denom <= 0 {
+		denom = 1
+	}
+	return float64(day.Positive) / float64(denom), nil
 }
 
 type BreadthEngine struct {

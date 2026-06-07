@@ -71,7 +71,7 @@ func (s *Server) getSnapshot(ctx context.Context) scanner.Snapshot {
 	if time.Since(s.snapAt) < 60*time.Second && !s.snapAt.IsZero() {
 		return s.snapCache
 	}
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 	snap, _ := s.scanner.Refresh(ctx)
 	s.snapCache = snap

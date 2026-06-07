@@ -1,9 +1,61 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
-<head><meta charset="UTF-8"><title>Market | AHRM</title></head>
-<body style="font-family:Tahoma;background:#0f172a;color:#e2e8f0">
-<a href="/dashboard">داشبورد</a>
-<h1>بازار</h1>
-<p>Breadth avg10: {{printf "%.4f" .Snapshot.Breadth.Average10Day}} alert={{.Snapshot.Breadth.AlertState}}</p>
-<p>A/D avg10: {{printf "%.4f" .Snapshot.AdvanceDecline.Average10Day}} alert={{.Snapshot.AdvanceDecline.AlertState}}</p>
-</body></html>
+<head>
+  <meta charset="UTF-8">
+  <title>{{.Title}} | AHRM</title>
+  <style>
+    body { font-family: Tahoma, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+    header { background: #1e293b; padding: 1rem 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+    header a { color: #93c5fd; text-decoration: none; }
+    main { padding: 1.5rem 2rem; }
+    .card { background: #1e293b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .alert-high { color: #f87171; }
+    .alert-low { color: #fbbf24; }
+    .alert-normal { color: #86efac; }
+    .muted { color: #94a3b8; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>AHRM Scanner</strong>
+    <a href="/dashboard">داشبورد</a>
+    <a href="/arbitrage">آربیتراژ</a>
+    <a href="/hv">HV</a>
+    <a href="/market">بازار</a>
+    <a href="/matrix">ماتریس</a>
+  </header>
+  <main>
+    <h1>شاخص‌های بازار</h1>
+    <p class="muted">زمان: {{.Snapshot.GeneratedAt.Format "2006-01-02 15:04:05"}} UTC</p>
+
+    <div class="card">
+      <h3>Breadth Thrust</h3>
+      <p>امروز: {{printf "%.4f" .Snapshot.Breadth.CurrentValue}}</p>
+      <p>میانگین ۱۰ روز: {{printf "%.4f" .Snapshot.Breadth.Average10Day}}</p>
+      <p>وضعیت: <span class="alert-{{.Snapshot.Breadth.AlertState}}">{{if .Snapshot.Breadth.AlertState}}{{.Snapshot.Breadth.AlertState}}{{else}}—{{end}}</span></p>
+      <p class="muted">آستانه بالا: 0.618 | آستانه پایین: 0.4</p>
+    </div>
+
+    <div class="card">
+      <h3>Advance / Decline</h3>
+      <p>امروز: {{printf "%.4f" .Snapshot.AdvanceDecline.CurrentValue}}</p>
+      <p>میانگین ۱۰ روز: {{printf "%.4f" .Snapshot.AdvanceDecline.Average10Day}}</p>
+      <p>وضعیت: <span class="alert-{{.Snapshot.AdvanceDecline.AlertState}}">{{if .Snapshot.AdvanceDecline.AlertState}}{{.Snapshot.AdvanceDecline.AlertState}}{{else}}—{{end}}</span></p>
+      <p class="muted">آستانه بالا: 2.0 | آستانه پایین: 0.8</p>
+    </div>
+
+    {{if and (eq .Snapshot.Breadth.Average10Day 0.0) (eq .Snapshot.Breadth.CurrentValue 0.0)}}
+    <div class="card">
+      <p class="muted">داده بازار هنوز محاسبه نشده. یک بار داشبورد را باز کنید تا snapshot تازه شود، یا چند روز صبر کنید تا تاریخچه ۱۰ روزه کامل شود.</p>
+    </div>
+    {{end}}
+
+    {{if .Snapshot.Errors}}
+    <div class="card">
+      <h3>یادداشت</h3>
+      {{range .Snapshot.Errors}}<p class="muted">{{.}}</p>{{end}}
+    </div>
+    {{end}}
+  </main>
+</body>
+</html>

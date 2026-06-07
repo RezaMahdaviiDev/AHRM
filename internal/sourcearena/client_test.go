@@ -66,6 +66,28 @@ func TestClientAPIError(t *testing.T) {
 	}
 }
 
+func TestDecodeOptionsStringNumbers(t *testing.T) {
+	payload := `[{"name":"ضهرم3023","close_price":13500,"close_price_change_percent":"24.56","emal_price":26000,"to_date":"1405/03/27","basis_name":"اهرم","op":"90068"}]`
+	opts, err := sourcearena.DecodeOptionsForTest([]byte(payload))
+	if err != nil {
+		t.Fatalf("DecodeOptionsForTest() error = %v", err)
+	}
+	if len(opts) != 1 || opts[0].OpenPosition != 90068 {
+		t.Fatalf("got %+v", opts)
+	}
+}
+
+func TestDecodeSymbolsStringNumbers(t *testing.T) {
+	payload := `{"name":"اهرم","close_price":"37649","close_price_change_percent":"4%"}`
+	symbols, err := sourcearena.DecodeSymbolsForTest(json.RawMessage(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if symbols[0].ClosePrice != 37649 || symbols[0].ClosePriceChangePct != 4 {
+		t.Fatalf("got %+v", symbols[0])
+	}
+}
+
 func TestDecodeSymbolsArray(t *testing.T) {
 	payload := `[{"name":"اهرم","close_price":25000,"close_price_change_percent":1.2}]`
 	var raw json.RawMessage = []byte(payload)

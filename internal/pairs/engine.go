@@ -54,7 +54,7 @@ func (e *Engine) Match(options []sourcearena.Option) ([]Pair, error) {
 		}
 		expiry, err := jalali.ParseDate(call.ExpiryDate)
 		if err != nil {
-			return nil, fmt.Errorf("parse expiry %q: %w", call.ExpiryDate, err)
+			continue
 		}
 		days := jalali.CalendarDaysUntil(now, expiry)
 		if days <= e.MinDays {
