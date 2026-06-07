@@ -1,0 +1,41 @@
+[
+  {
+    "name": "ضهرم1200",
+    "close_price": 1500,
+    "close_price_change_percent": 2.5,
+    "emal_price": 12000,
+    "to_date": "1405/12/15",
+    "basis_name": "اهرم",
+    "basis_price_percent": 1.2,
+    "op": 100,
+    "trade_value": 5000000,
+    "lowest_price": 1400,
+    "highest_price": 1600
+  },
+  {
+    "name": "طهرم1200",
+    "close_price": 800,
+    "close_price_change_percent": -1.1,
+    "emal_price": 12000,
+    "to_date": "1405/12/15",
+    "basis_name": "اهرم",
+    "basis_price_percent": 1.2,
+    "op": 90,
+    "trade_value": 3000000,
+    "lowest_price": 750,
+    "highest_price": 850
+  },
+  {
+    "name": "ضهرم1300",
+    "close_price": 1200,
+    "close_price_change_percent": 0.5,
+    "emal_price": 13000,
+    "to_date": "1404/04/01",
+    "basis_name": "اهرم",
+    "basis_price_percent": 0.5,
+    "op": 50,
+    "trade_value": 1000000,
+    "lowest_price": 1100,
+    "highest_price": 1250
+  }
+]

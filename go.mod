@@ -5,6 +5,7 @@ go 1.22
 require (
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/joho/godotenv v1.5.1
+	github.com/yaa110/go-persian-calendar v1.3.0
 )
 
 require (
