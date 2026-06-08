@@ -34,6 +34,8 @@
     </p>
     <table>
       <tr>
+        <th>نماد</th>
+        <th>حجم فروش</th>
         <th>سررسید</th>
         <th>اعمال</th>
         <th>R%</th>
@@ -43,6 +45,8 @@
       </tr>
       {{range .Snapshot.Opportunities}}
       <tr>
+        <td>{{.Symbol}}</td>
+        <td>{{printf "%.0f" .SellVolume}}</td>
         <td>{{.Expiry}}</td>
         <td>{{printf "%.0f" .Strike}}</td>
         <td class="positive">{{printf "%.2f" .ReturnPct}}</td>
@@ -51,7 +55,7 @@
         <td>{{printf "%.0f" .Capital}}</td>
       </tr>
       {{else}}
-      <tr><td colspan="6">بدون فرصت آربیتراژ — snapshot در حال بارگذاری است یا جفت call/put واجد شرایط نیست.</td></tr>
+      <tr><td colspan="8">بدون فرصت آربیتراژ — snapshot در حال بارگذاری است یا جفت call/put واجد شرایط نیست.</td></tr>
       {{end}}
     </table>
     {{if .Snapshot.Errors}}

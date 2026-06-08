@@ -2,10 +2,12 @@
 <h1>فرصت‌های آربیتراژ</h1>
 <div class="card">
 <table>
-  <thead><tr><th>سررسید</th><th>اعمال</th><th>R %</th><th>Call</th><th>Put</th><th>سرمایه</th></tr></thead>
+  <thead><tr><th>نماد</th><th>حجم فروش</th><th>سررسید</th><th>اعمال</th><th>R %</th><th>Call</th><th>Put</th><th>سرمایه</th></tr></thead>
   <tbody>
   {{range .Snapshot.Opportunities}}
     <tr>
+      <td>{{.Symbol}}</td>
+      <td>{{printf "%.0f" .SellVolume}}</td>
       <td>{{.Expiry}}</td>
       <td>{{printf "%.0f" .Strike}}</td>
       <td>{{printf "%.2f" .ReturnPct}}</td>
@@ -14,7 +16,7 @@
       <td>{{printf "%.0f" .Capital}}</td>
     </tr>
   {{else}}
-    <tr><td colspan="6">داده‌ای یافت نشد</td></tr>
+    <tr><td colspan="8">داده‌ای یافت نشد</td></tr>
   {{end}}
   </tbody>
 </table>

@@ -11,14 +11,17 @@ import (
 func TestCalculateFormula(t *testing.T) {
 	engine := arbitrage.NewEngine()
 	pair := pairs.Pair{
-		Call:        sourcearena.Option{ClosePrice: 1500},
-		Put:         sourcearena.Option{ClosePrice: 800},
+		Call: sourcearena.Option{Name: "ضهرم1200", ClosePrice: 1500, RealSellVolume: 250000},
+		Put:  sourcearena.Option{ClosePrice: 800},
 		Strike:      12000,
 		ExpiryLabel: "1404/09/15",
 	}
 	opp, err := engine.Calculate(pair, 25000)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if opp.Symbol != "ضهرم1200" || opp.SellVolume != 250000 {
+		t.Fatalf("symbol=%q sell_volume=%v", opp.Symbol, opp.SellVolume)
 	}
 	if opp.Spread != 700 {
 		t.Fatalf("spread=%v", opp.Spread)

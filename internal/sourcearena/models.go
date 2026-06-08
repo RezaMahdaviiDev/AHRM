@@ -27,6 +27,7 @@ type optionWire struct {
 	BasisName           string    `json:"basis_name"`
 	BasisPricePercent   flexFloat `json:"basis_price_percent"`
 	OpenPosition        flexFloat `json:"op"`
+	RealSellVolume      flexFloat `json:"real_sell_volume"`
 	TradeValue          flexFloat `json:"trade_value"`
 	LowestPrice         flexFloat `json:"lowest_price"`
 	HighestPrice        flexFloat `json:"highest_price"`
@@ -49,6 +50,7 @@ type Option struct {
 	BasisName              string  `json:"basis_name"`
 	BasisPricePercent      float64 `json:"basis_price_percent"`
 	OpenPosition           float64 `json:"op"`
+	RealSellVolume         float64 `json:"real_sell_volume"`
 	TradeValue             float64 `json:"trade_value"`
 	LowestPrice            float64 `json:"lowest_price"`
 	HighestPrice           float64 `json:"highest_price"`
@@ -153,6 +155,7 @@ func wiresToOptions(wires []optionWire) []Option {
 			BasisName:           w.BasisName,
 			BasisPricePercent:   float64(w.BasisPricePercent),
 			OpenPosition:        float64(w.OpenPosition),
+			RealSellVolume:      float64(w.RealSellVolume),
 			TradeValue:          float64(w.TradeValue),
 			LowestPrice:         float64(w.LowestPrice),
 			HighestPrice:        float64(w.HighestPrice),

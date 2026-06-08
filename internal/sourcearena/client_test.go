@@ -67,12 +67,12 @@ func TestClientAPIError(t *testing.T) {
 }
 
 func TestDecodeOptionsStringNumbers(t *testing.T) {
-	payload := `[{"name":"ضهرم3023","close_price":13500,"close_price_change_percent":"24.56","emal_price":26000,"to_date":"1405/03/27","basis_name":"اهرم","op":"90068"}]`
+	payload := `[{"name":"ضهرم3023","close_price":13500,"close_price_change_percent":"24.56","emal_price":26000,"to_date":"1405/03/27","basis_name":"اهرم","op":"90068","real_sell_volume":"1250000"}]`
 	opts, err := sourcearena.DecodeOptionsForTest([]byte(payload))
 	if err != nil {
 		t.Fatalf("DecodeOptionsForTest() error = %v", err)
 	}
-	if len(opts) != 1 || opts[0].OpenPosition != 90068 {
+	if len(opts) != 1 || opts[0].OpenPosition != 90068 || opts[0].RealSellVolume != 1250000 {
 		t.Fatalf("got %+v", opts)
 	}
 }
