@@ -1,5 +1,3 @@
-{"time":"2026-06-07T10:09:08.900326047Z","level":"INFO","msg":"startup readiness","report":{"config_loaded":true,"supabase":{"configured":true,"connected":true},"sourcearena":{"configured":true},"telegram":{"configured":true}}}
-{"time":"2026-06-07T10:09:08.90076531Z","level":"INFO","msg":"server listening","addr":":8090"}
-{"time":"2026-06-07T10:21:02.479696452Z","level":"INFO","msg":"server stopped"}
-{"time":"2026-06-07T10:21:05.043200148Z","level":"INFO","msg":"startup readiness","report":{"config_loaded":true,"supabase":{"configured":true,"connected":true},"sourcearena":{"configured":true},"telegram":{"configured":true}}}
-{"time":"2026-06-07T10:21:05.043643358Z","level":"INFO","msg":"server listening","addr":":8090"}
+{"time":"2026-06-08T11:20:36.2533336+03:30","level":"INFO","msg":"startup readiness","report":{"config_loaded":true,"supabase":{"configured":true,"connected":true},"sourcearena":{"configured":true},"telegram":{"configured":true}}}
+{"time":"2026-06-08T11:20:36.2539076+03:30","level":"INFO","msg":"server listening","addr":":8090"}
+2026/06/08 11:26:39 http: superfluous response.WriteHeader call from ahrm/internal/server.(*Server).registerPages.(*Server).pageHandler.func6 (pages.go:52)
