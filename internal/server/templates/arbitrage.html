@@ -11,6 +11,10 @@
     table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; }
     td, th { border: 1px solid #334155; padding: 0.5rem 0.75rem; text-align: center; }
     th { background: #0f172a; }
+    th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    th.sortable:hover { background: #1e293b; }
+    th.sortable .sort-icon { margin-right: 0.35rem; opacity: 0.45; font-size: 0.75rem; }
+    th.sortable.active .sort-icon { opacity: 1; color: #93c5fd; }
     tr:nth-child(even) { background: #172033; }
     .muted { color: #94a3b8; }
     .positive { color: #86efac; }
@@ -32,31 +36,37 @@
       قیمت {{.Snapshot.Underlying.Name}}: {{printf "%.0f" .Snapshot.Underlying.ClosePrice}} |
       تعداد: {{len .Snapshot.Opportunities}}
     </p>
-    <table>
-      <tr>
-        <th>نماد</th>
-        <th>حجم فروش</th>
-        <th>سررسید</th>
-        <th>اعمال</th>
-        <th>R%</th>
-        <th>Call</th>
-        <th>Put</th>
-        <th>سرمایه</th>
-      </tr>
+    <table id="arb-table">
+      <thead>
+        <tr>
+          <th class="sortable" data-col="0" data-type="text">نماد <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="1" data-type="number">حجم فروش ردیف اول <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="2" data-type="number">حجم خرید ردیف اول <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="3" data-type="date">سررسید <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="4" data-type="number">اعمال <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="5" data-type="number">R% <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="6" data-type="number">Call <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="7" data-type="number">Put <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="8" data-type="number">سرمایه <span class="sort-icon"></span></th>
+        </tr>
+      </thead>
+      <tbody id="arb-body">
       {{range .Snapshot.Opportunities}}
       <tr>
         <td>{{.Symbol}}</td>
-        <td>{{printf "%.0f" .SellVolume}}</td>
-        <td>{{.Expiry}}</td>
-        <td>{{printf "%.0f" .Strike}}</td>
-        <td class="positive">{{printf "%.2f" .ReturnPct}}</td>
-        <td>{{printf "%.0f" .CallPrice}}</td>
-        <td>{{printf "%.0f" .PutPrice}}</td>
-        <td>{{printf "%.0f" .Capital}}</td>
+        <td data-value="{{printf "%.0f" .SellRow1Volume}}">{{printf "%.0f" .SellRow1Volume}}</td>
+        <td data-value="{{printf "%.0f" .BuyRow1Volume}}">{{printf "%.0f" .BuyRow1Volume}}</td>
+        <td data-value="{{.Expiry}}">{{.Expiry}}</td>
+        <td data-value="{{printf "%.0f" .Strike}}">{{printf "%.0f" .Strike}}</td>
+        <td class="positive" data-value="{{printf "%.4f" .ReturnPct}}">{{printf "%.2f" .ReturnPct}}</td>
+        <td data-value="{{printf "%.0f" .CallPrice}}">{{printf "%.0f" .CallPrice}}</td>
+        <td data-value="{{printf "%.0f" .PutPrice}}">{{printf "%.0f" .PutPrice}}</td>
+        <td data-value="{{printf "%.0f" .Capital}}">{{printf "%.0f" .Capital}}</td>
       </tr>
       {{else}}
-      <tr><td colspan="8">بدون فرصت آربیتراژ — snapshot در حال بارگذاری است یا جفت call/put واجد شرایط نیست.</td></tr>
+      <tr class="empty-row"><td colspan="9">بدون فرصت آربیتراژ — snapshot در حال بارگذاری است یا جفت call/put واجد شرایط نیست.</td></tr>
       {{end}}
+      </tbody>
     </table>
     {{if .Snapshot.Errors}}
     <div class="muted" style="margin-top:1rem">
@@ -64,5 +74,73 @@
     </div>
     {{end}}
   </main>
+  <script>
+    (function () {
+      const tbody = document.getElementById('arb-body');
+      const headers = document.querySelectorAll('#arb-table th.sortable');
+      if (!tbody || headers.length === 0) return;
+
+      const rows = Array.from(tbody.querySelectorAll('tr:not(.empty-row)'));
+      if (rows.length === 0) return;
+
+      let activeCol = null;
+      let asc = true;
+
+      function parseDate(s) {
+        const parts = String(s).trim().split('/');
+        if (parts.length !== 3) return 0;
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const d = parseInt(parts[2], 10);
+        return (y * 10000) + (m * 100) + d;
+      }
+
+      function cellValue(row, col, type) {
+        const cell = row.children[col];
+        if (!cell) return '';
+        const raw = cell.dataset.value !== undefined ? cell.dataset.value : cell.textContent;
+        if (type === 'number') return parseFloat(raw) || 0;
+        if (type === 'date') return parseDate(raw);
+        return String(raw).trim();
+      }
+
+      function compare(a, b, type) {
+        if (type === 'number' || type === 'date') return a - b;
+        return String(a).localeCompare(String(b), 'fa');
+      }
+
+      function updateIcons(th, dir) {
+        headers.forEach(h => {
+          h.classList.remove('active');
+          const icon = h.querySelector('.sort-icon');
+          if (icon) icon.textContent = '';
+        });
+        th.classList.add('active');
+        const icon = th.querySelector('.sort-icon');
+        if (icon) icon.textContent = dir === 'asc' ? '▲' : '▼';
+      }
+
+      headers.forEach(th => {
+        th.addEventListener('click', function () {
+          const col = parseInt(th.dataset.col, 10);
+          const type = th.dataset.type || 'text';
+          if (activeCol === col) {
+            asc = !asc;
+          } else {
+            activeCol = col;
+            asc = true;
+          }
+          const sorted = rows.slice().sort((ra, rb) => {
+            const va = cellValue(ra, col, type);
+            const vb = cellValue(rb, col, type);
+            const c = compare(va, vb, type);
+            return asc ? c : -c;
+          });
+          sorted.forEach(r => tbody.appendChild(r));
+          updateIcons(th, asc ? 'asc' : 'desc');
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

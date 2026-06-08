@@ -7,9 +7,10 @@ import (
 )
 
 type Opportunity struct {
-	Symbol      string  `json:"symbol"`
-	SellVolume  float64 `json:"sell_volume"`
-	Expiry      string  `json:"expiry"`
+	Symbol         string  `json:"symbol"`
+	SellRow1Volume float64 `json:"1_sell_volume"`
+	BuyRow1Volume  float64 `json:"1_buy_volume"`
+	Expiry         string  `json:"expiry"`
 	Strike      float64 `json:"strike"`
 	ReturnPct   float64 `json:"return_pct"`
 	CallPrice   float64 `json:"call_price"`
@@ -39,9 +40,10 @@ func (e *Engine) Calculate(pair pairs.Pair, underlyingPrice float64) (Opportunit
 	}
 	ret := ((pair.Strike - capital) / capital) * 100
 	return Opportunity{
-		Symbol:     pair.Call.Name,
-		SellVolume: pair.Call.RealSellVolume,
-		Expiry:     pair.ExpiryLabel,
+		Symbol:         pair.Call.Name,
+		SellRow1Volume: pair.Call.SellRow1Volume,
+		BuyRow1Volume:  pair.Call.BuyRow1Volume,
+		Expiry:         pair.ExpiryLabel,
 		Strike:     pair.Strike,
 		ReturnPct:  ret,
 		CallPrice:  call,
