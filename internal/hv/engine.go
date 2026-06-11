@@ -12,10 +12,19 @@ const (
 	HVMultiplier = 15.8
 )
 
+type SeriesPoint struct {
+	Time   int64   `json:"t"`
+	Close  float64 `json:"close"`
+	LogRet float64 `json:"log_ret,omitempty"`
+}
+
 type Result struct {
-	HVPct            float64 `json:"hv_pct"`
-	DailyVolatility  float64 `json:"daily_volatility"`
-	SampleSize       int     `json:"sample_size"`
+	HVPct           float64       `json:"hv_pct"`
+	DailyVolatility float64       `json:"daily_volatility"`
+	SampleSize      int           `json:"sample_size"`
+	TradingDays     int           `json:"trading_days"`
+	HVMultiplier    float64       `json:"hv_multiplier"`
+	Series          []SeriesPoint `json:"series,omitempty"`
 }
 
 type Engine struct {
@@ -39,13 +48,19 @@ func (e *Engine) Calculate(candles []sourcearena.Candle) (Result, error) {
 	}
 	recent := candles[len(candles)-e.TradingDays-1:]
 	returns := make([]float64, 0, e.TradingDays)
-	for i := 1; i < len(recent); i++ {
-		prev := recent[i-1].Close
-		cur := recent[i].Close
-		if prev <= 0 || cur <= 0 {
+	series := make([]SeriesPoint, 0, len(recent))
+	for i, candle := range recent {
+		if candle.Close <= 0 {
 			return Result{}, fmt.Errorf("invalid candle price at index %d", i)
 		}
-		returns = append(returns, math.Log(cur/prev))
+		point := SeriesPoint{Time: candle.Time, Close: candle.Close}
+		if i > 0 {
+			prev := recent[i-1].Close
+			logRet := math.Log(candle.Close / prev)
+			returns = append(returns, logRet)
+			point.LogRet = logRet
+		}
+		series = append(series, point)
 	}
 	dailyVol := stdDev(returns)
 	hv := dailyVol * e.HVMultiplier * 100
@@ -53,6 +68,9 @@ func (e *Engine) Calculate(candles []sourcearena.Candle) (Result, error) {
 		HVPct:           hv,
 		DailyVolatility: dailyVol,
 		SampleSize:      len(returns),
+		TradingDays:     e.TradingDays,
+		HVMultiplier:    e.HVMultiplier,
+		Series:          series,
 	}, nil
 }
 

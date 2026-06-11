@@ -17,6 +17,8 @@ import (
 	"ahrm/internal/sourcearena"
 )
 
+const hvCandleLookbackDays = 180
+
 type Service struct {
 	cfg        *config.Config
 	client     *sourcearena.Client
@@ -30,10 +32,20 @@ type Service struct {
 	alerts     *alerts.Engine
 }
 
+type HVFetch struct {
+	Symbol     string    `json:"symbol"`
+	From       time.Time `json:"from"`
+	To         time.Time `json:"to"`
+	Resolution string    `json:"resolution"`
+	Type       int       `json:"type"`
+	TypeLabel  string    `json:"type_label"`
+}
+
 type Snapshot struct {
 	GeneratedAt   time.Time                    `json:"generated_at"`
 	Underlying    sourcearena.SymbolQuote      `json:"underlying"`
 	HV            hv.Result                    `json:"hv"`
+	HVFetch       HVFetch                      `json:"hv_fetch"`
 	Breadth       indicators.IndicatorResult   `json:"breadth"`
 	AdvanceDecline indicators.IndicatorResult  `json:"advance_decline"`
 	Opportunities []arbitrage.Opportunity      `json:"opportunities"`
@@ -107,9 +119,24 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		}
 	}
 
-	from := time.Now().AddDate(0, 0, -90)
+	from := time.Now().AddDate(0, 0, -hvCandleLookbackDays)
 	to := time.Now()
-	candles, err := s.client.FetchDailyCandles(ctx, domain.UnderlyingSymbol, from, to)
+	hvReq := sourcearena.CandleRequest{
+		Symbol:     domain.UnderlyingSymbol,
+		From:       from,
+		To:         to,
+		Resolution: sourcearena.Resolution1D,
+		Type:       sourcearena.AdjustCapAndDividend,
+	}
+	snap.HVFetch = HVFetch{
+		Symbol:     hvReq.Symbol,
+		From:       hvReq.From,
+		To:         hvReq.To,
+		Resolution: hvReq.Resolution,
+		Type:       hvReq.Type,
+		TypeLabel:  "افزایش سرمایه و سود نقدی",
+	}
+	candles, err := s.client.FetchCandles(ctx, hvReq)
 	if err != nil {
 		snap.Errors = append(snap.Errors, fmt.Sprintf("candles: %v", err))
 	} else if hvResult, hvErr := s.hvEngine.Calculate(candles); hvErr == nil {

@@ -34,15 +34,21 @@ func TestClientFetchOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-Header-Token") != "test-token" {
-			t.Fatalf("missing header token")
+		if r.Header.Get("X-Header-Token") != "" {
+			t.Fatalf("market API must not use X-Header-Token header")
+		}
+		if r.URL.Query().Get("all") != "e" {
+			t.Fatalf("unexpected query: %v", r.URL.Query())
+		}
+		if r.URL.Query().Get("token") != "test-token" {
+			t.Fatalf("token query param required for market API")
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(raw)
 	}))
 	defer srv.Close()
 
-	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "test-token"}, srv.URL, sourcearena.NopRawStore{})
+	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "test-token"}, srv.URL, srv.URL, sourcearena.NopRawStore{})
 	opts, err := client.FetchOptions(context.Background())
 	if err != nil {
 		t.Fatalf("FetchOptions() error = %v", err)
@@ -59,7 +65,7 @@ func TestClientAPIError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "bad"}, srv.URL, sourcearena.NopRawStore{})
+	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "bad"}, srv.URL, srv.URL, sourcearena.NopRawStore{})
 	_, err := client.FetchOptions(context.Background())
 	if err == nil {
 		t.Fatal("expected error")
@@ -102,16 +108,62 @@ func TestDecodeSymbolsArray(t *testing.T) {
 
 func TestFetchDailyCandles(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-Header-Token"); got != "test-token" {
+			t.Fatalf("X-Header-Token=%q, want test-token", got)
+		}
+		if r.URL.Query().Get("token") != "" {
+			t.Fatalf("candle API must not use token query param")
+		}
+		q := r.URL.Query()
+		if q.Get("symbol") != "اهرم" || q.Get("resolution") != "1D" || q.Get("type") != "1" {
+			t.Fatalf("unexpected query: %v", q)
+		}
 		_, _ = w.Write([]byte(`[{"c":100,"h":110,"l":90,"o":95,"v":10,"t":1},{"c":105,"h":112,"l":92,"o":100,"v":12,"t":2}]`))
 	}))
 	defer srv.Close()
 
-	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "test-token"}, srv.URL, sourcearena.NopRawStore{})
+	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "test-token"}, srv.URL, srv.URL, sourcearena.NopRawStore{})
 	candles, err := client.FetchDailyCandles(context.Background(), "اهرم", time.Unix(1, 0), time.Unix(2, 0))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(candles) != 2 {
 		t.Fatalf("len(candles)=%d", len(candles))
+	}
+}
+
+func TestDecodeCandlesAPIError(t *testing.T) {
+	_, err := sourcearena.DecodeCandlesForTest([]byte(`{"success":false,"message":"توکن وب سرویس را وارد کنید","error_code":1001}`))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestDecodeCandlesWrappedData(t *testing.T) {
+	candles, err := sourcearena.DecodeCandlesForTest([]byte(`{"success":true,"data":[{"c":100,"t":1},{"c":105,"t":2}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(candles) != 2 {
+		t.Fatalf("len=%d", len(candles))
+	}
+}
+
+func TestFetchCandlesCustomType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("type") != "4" || r.URL.Query().Get("resolution") != "1W" {
+			t.Fatalf("query=%v", r.URL.Query())
+		}
+		_, _ = w.Write([]byte(`[{"c":100,"t":1}]`))
+	}))
+	defer srv.Close()
+
+	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "test-token"}, srv.URL, srv.URL, sourcearena.NopRawStore{})
+	_, err := client.FetchCandles(context.Background(), sourcearena.CandleRequest{
+		Symbol: "فملی", From: time.Unix(1, 0), To: time.Unix(2, 0),
+		Resolution: "1W", Type: sourcearena.AdjustPerformance,
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

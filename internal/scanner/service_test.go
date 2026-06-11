@@ -27,7 +27,7 @@ func TestRefreshWithMockAPI(t *testing.T) {
 		switch {
 		case q.Get("all") == "e":
 			_, _ = w.Write(raw)
-		case q.Has("all"):
+		case q.Get("all") != "" && q.Get("type") != "":
 			_, _ = w.Write([]byte(symbols))
 		case q.Get("name") != "":
 			_, _ = w.Write([]byte(`{"name":"اهرم","close_price":25000,"close_price_change_percent":1.2}`))
@@ -46,7 +46,7 @@ func TestRefreshWithMockAPI(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "t"}, srv.URL, sourcearena.NopRawStore{})
+	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "t"}, srv.URL, srv.URL, sourcearena.NopRawStore{})
 	cfg := &config.Config{}
 	svc := scanner.NewService(cfg, client, nil, nil)
 	snap, err := svc.Refresh(context.Background())

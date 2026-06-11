@@ -30,6 +30,9 @@ func TestCalculateHV(t *testing.T) {
 	if result.HVPct <= 0 {
 		t.Fatalf("hv=%v", result.HVPct)
 	}
+	if len(result.Series) != 41 {
+		t.Fatalf("series len=%d", len(result.Series))
+	}
 }
 
 func TestLogReturnStdDev(t *testing.T) {

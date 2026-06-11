@@ -1,9 +1,138 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
-<head><meta charset="UTF-8"><title>HV | AHRM</title></head>
-<body style="font-family:Tahoma;background:#0f172a;color:#e2e8f0">
-<a href="/dashboard">داشبورد</a>
-<h1>Historical Volatility</h1>
-<p>HV: {{printf "%.2f" .Snapshot.HV.HVPct}}%</p>
-<p>Daily Vol: {{printf "%.6f" .Snapshot.HV.DailyVolatility}}</p>
-</body></html>
+<head>
+  <meta charset="UTF-8">
+  <title>{{.Title}} | AHRM</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Tahoma, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+    header { background: #1e293b; padding: 1rem 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+    header a { color: #93c5fd; text-decoration: none; }
+    main { padding: 1.5rem 2rem; }
+    .card { background: #1e293b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .muted { color: #94a3b8; font-size: 0.9rem; }
+    code { background: #334155; padding: 0.1rem 0.35rem; border-radius: 4px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+    .metric { font-size: 1.6rem; font-weight: bold; color: #34d399; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 0.5rem; }
+    th, td { border: 1px solid #334155; padding: 0.35rem; text-align: center; }
+    .errors { color: #fca5a5; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>AHRM Scanner</strong>
+    <a href="/dashboard">داشبورد</a>
+    <a href="/arbitrage">آربیتراژ</a>
+    <a href="/hv">HV</a>
+    <a href="/market">بازار</a>
+    <a href="/matrix">ماتریس</a>
+  </header>
+  <main>
+    <h1>Historical Volatility — {{.Snapshot.HVFetch.Symbol}}</h1>
+    <p class="muted">زمان: {{.Snapshot.GeneratedAt.Format "2006-01-02 15:04:05"}} UTC</p>
+
+    <div class="grid">
+      <div class="card">
+        <div class="muted">HV (σ × {{printf "%.1f" .Snapshot.HV.HVMultiplier}} × 100)</div>
+        <div class="metric">{{printf "%.2f" .Snapshot.HV.HVPct}}%</div>
+      </div>
+      <div class="card">
+        <div class="muted">نوسان روزانه (σ)</div>
+        <div class="metric">{{printf "%.6f" .Snapshot.HV.DailyVolatility}}</div>
+      </div>
+      <div class="card">
+        <div class="muted">نمونه بازده لگاریتمی</div>
+        <div class="metric">{{.Snapshot.HV.SampleSize}} روز</div>
+      </div>
+      <div class="card">
+        <div class="muted">قیمت پایه</div>
+        <div class="metric">{{printf "%.0f" .Snapshot.Underlying.ClosePrice}}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <strong>فرمول محاسبه</strong>
+      <p class="muted">
+        داده روزانه از SourceArena v2 candle با <code>resolution={{.Snapshot.HVFetch.Resolution}}</code>
+        و <code>type={{.Snapshot.HVFetch.Type}}</code> ({{.Snapshot.HVFetch.TypeLabel}}).
+        بازه درخواست: ۱۸۰ روز تقویمی. روی {{.Snapshot.HV.TradingDays}} روز معاملاتی آخر، بازده لگاریتمی
+        <code>ln(P<sub>t</sub>/P<sub>t-1</sub>)</code> محاسبه و انحراف معیار (σ) گرفته می‌شود.
+        HV = σ × {{printf "%.1f" .Snapshot.HV.HVMultiplier}} × 100
+      </p>
+      <p class="muted">
+        API: <code>GET api3.sourcearena.ir/api/v2/candle/1m</code>
+        — هدر <code>X-Header-Token</code>
+        — <code>from</code>/<code>to</code> unix time
+      </p>
+      <table>
+        <tr><th>symbol</th><th>from</th><th>to</th><th>resolution</th><th>type</th></tr>
+        <tr>
+          <td>{{.Snapshot.HVFetch.Symbol}}</td>
+          <td>{{.Snapshot.HVFetch.From.Unix}}</td>
+          <td>{{.Snapshot.HVFetch.To.Unix}}</td>
+          <td>{{.Snapshot.HVFetch.Resolution}}</td>
+          <td>{{.Snapshot.HVFetch.Type}} — {{.Snapshot.HVFetch.TypeLabel}}</td>
+        </tr>
+      </table>
+      <p class="muted" style="margin-top:0.75rem">
+        انواع تعدیل: 0 تعدیل‌نشده، 1 افزایش سرمایه+سود نقدی، 2 افزایش سرمایه، 3 سود نقدی، 4 عملکردی
+        — resolution: 1, 15, 30, 60, 120, 240, 1D, 1W, 1M
+      </p>
+    </div>
+
+    {{if .Snapshot.HV.Series}}
+    <div class="card">
+      <strong>قیمت پایانی روزانه ({{len .Snapshot.HV.Series}} کندل)</strong>
+      <canvas id="priceChart" height="120"></canvas>
+    </div>
+    <div class="card">
+      <strong>بازده لگاریتمی روزانه</strong>
+      <canvas id="retChart" height="120"></canvas>
+    </div>
+    <script>
+    (function() {
+      const series = [
+        {{range $i, $p := .Snapshot.HV.Series}}{{if $i}},{{end}}
+        {t: {{$p.Time}}, close: {{printf "%.4f" $p.Close}}, logRet: {{printf "%.6f" $p.LogRet}}}
+        {{end}}
+      ];
+      const labels = series.map(p => p.t ? new Date(p.t * 1000).toLocaleDateString('fa-IR') : '');
+      const closes = series.map(p => p.close);
+      const logRets = series.map(p => p.logRet);
+
+      new Chart(document.getElementById('priceChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{ label: 'قیمت پایانی', data: closes, borderColor: '#38bdf8', pointRadius: 0, tension: 0.15 }]
+        },
+        options: { plugins: { legend: { labels: { color: '#e2e8f0' } } }, scales: { x: { ticks: { color: '#94a3b8', maxTicksLimit: 10 } }, y: { ticks: { color: '#94a3b8' } } } }
+      });
+
+      new Chart(document.getElementById('retChart'), {
+        type: 'bar',
+        data: {
+          labels: labels.slice(1),
+          datasets: [{ label: 'ln(Pt/Pt-1)', data: logRets.slice(1), backgroundColor: '#34d399' }]
+        },
+        options: { plugins: { legend: { labels: { color: '#e2e8f0' } } }, scales: { x: { ticks: { color: '#94a3b8', maxTicksLimit: 10 } }, y: { ticks: { color: '#94a3b8' } } } }
+      });
+    })();
+    </script>
+    {{else}}
+    <div class="card errors">
+      <strong>داده کندل برای نمودار موجود نیست.</strong>
+      <p class="muted">حداقل {{.Snapshot.HV.TradingDays}} روز معاملاتی + 1 کندل از SourceArena لازم است.</p>
+    </div>
+    {{end}}
+
+    {{if .Snapshot.Errors}}
+    <div class="card errors">
+      <strong>خطاها</strong>
+      {{range .Snapshot.Errors}}<p class="muted">{{.}}</p>{{end}}
+    </div>
+    {{end}}
+  </main>
+</body>
+</html>

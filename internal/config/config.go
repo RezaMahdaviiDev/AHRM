@@ -28,6 +28,7 @@ type AlertsConfig struct {
 }
 
 type SupabaseConfig struct {
+	Enabled  bool
 	Host     string
 	Port     string
 	Name     string
@@ -59,6 +60,9 @@ type Readiness struct {
 }
 
 func (s SupabaseConfig) Configured() bool {
+	if !s.Enabled {
+		return false
+	}
 	return anyNonEmpty(s.Host, s.Port, s.Name, s.User, s.Password, s.SSLMode)
 }
 
@@ -106,6 +110,7 @@ func LoadFromEnv() (*Config, error) {
 		HTTPAddr: getenv("HTTP_ADDR", ":8080"),
 		LogLevel: getenv("LOG_LEVEL", "info"),
 		Supabase: SupabaseConfig{
+			Enabled:  parseBoolEnv("SUPABASE_ENABLED", false),
 			Host:     strings.TrimSpace(os.Getenv("SUPABASE_DB_HOST")),
 			Port:     strings.TrimSpace(os.Getenv("SUPABASE_DB_PORT")),
 			Name:     strings.TrimSpace(os.Getenv("SUPABASE_DB_NAME")),
@@ -133,15 +138,17 @@ func LoadFromEnv() (*Config, error) {
 }
 
 func (c *Config) Validate() error {
-	if err := validateGroup("supabase", c.Supabase.Configured(), map[string]string{
-		"SUPABASE_DB_HOST":     c.Supabase.Host,
-		"SUPABASE_DB_PORT":     c.Supabase.Port,
-		"SUPABASE_DB_NAME":     c.Supabase.Name,
-		"SUPABASE_DB_USER":     c.Supabase.User,
-		"SUPABASE_DB_PASSWORD": c.Supabase.Password,
-		"SUPABASE_DB_SSLMODE":  c.Supabase.SSLMode,
-	}); err != nil {
-		return err
+	if c.Supabase.Enabled {
+		if err := validateGroup("supabase", c.Supabase.Configured(), map[string]string{
+			"SUPABASE_DB_HOST":     c.Supabase.Host,
+			"SUPABASE_DB_PORT":     c.Supabase.Port,
+			"SUPABASE_DB_NAME":     c.Supabase.Name,
+			"SUPABASE_DB_USER":     c.Supabase.User,
+			"SUPABASE_DB_PASSWORD": c.Supabase.Password,
+			"SUPABASE_DB_SSLMODE":  c.Supabase.SSLMode,
+		}); err != nil {
+			return err
+		}
 	}
 	if err := validateGroup("sourcearena", c.SourceArena.Configured(), map[string]string{
 		"SOURCEARENA_API_TOKEN": c.SourceArena.APIToken,
@@ -230,6 +237,21 @@ func anyNonEmpty(values ...string) bool {
 		}
 	}
 	return false
+}
+
+func parseBoolEnv(key string, fallback bool) bool {
+	raw := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	if raw == "" {
+		return fallback
+	}
+	switch raw {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
 }
 
 func parseFloatEnv(key string, fallback float64) float64 {

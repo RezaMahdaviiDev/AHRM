@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -85,9 +88,19 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
+	listener, err := net.Listen("tcp", cfg.HTTPAddr)
+	if err != nil {
+		logger.Error("cannot bind HTTP port",
+			"addr", cfg.HTTPAddr,
+			"error", err,
+			"hint", portInUseHint(cfg.HTTPAddr),
+		)
+		os.Exit(1)
+	}
+
 	go func() {
 		logger.Info("server listening", "addr", cfg.HTTPAddr)
-		if serveErr := httpServer.ListenAndServe(); serveErr != nil && serveErr != http.ErrServerClosed {
+		if serveErr := httpServer.Serve(listener); serveErr != nil && serveErr != http.ErrServerClosed {
 			logger.Error("server error", "error", serveErr)
 			os.Exit(1)
 		}
@@ -137,4 +150,15 @@ func projectRoot() string {
 		return "."
 	}
 	return wd
+}
+
+func portInUseHint(addr string) string {
+	port := addr
+	if strings.HasPrefix(addr, ":") {
+		port = strings.TrimPrefix(addr, ":")
+	}
+	return fmt.Sprintf(
+		"port %s may already be in use — PowerShell: Get-NetTCPConnection -LocalPort %s -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }",
+		port, port,
+	)
 }

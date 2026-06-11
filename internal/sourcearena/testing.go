@@ -14,10 +14,15 @@ func DecodeSymbolsForTest(raw json.RawMessage) ([]SymbolQuote, error) {
 	return decodeSymbols(raw)
 }
 
-// NewTestClient builds a client pointed at a test server base URL.
-func NewTestClient(cfg config.SourceArenaConfig, baseURL string, store RawStore) *Client {
+func DecodeCandlesForTest(raw []byte) ([]Candle, error) {
+	return decodeCandles(json.RawMessage(raw))
+}
+
+// NewTestClient builds a client pointed at test server URLs.
+// marketBaseURL serves options/symbols; candleBaseURL serves candles.
+func NewTestClient(cfg config.SourceArenaConfig, marketBaseURL, candleBaseURL string, store RawStore) *Client {
 	c := NewClient(cfg, store)
-	c.v1Base = baseURL + "/"
-	c.v2Base = baseURL
+	c.marketBase = marketBaseURL + "/"
+	c.candleBase = candleBaseURL
 	return c
 }

@@ -34,6 +34,7 @@ func TestLoadDefaults(t *testing.T) {
 func TestValidatePartialSupabaseFails(t *testing.T) {
 	cfg := &config.Config{
 		Supabase: config.SupabaseConfig{
+			Enabled:  true,
 			Host:     "db.example.com",
 			Password: "",
 		},
@@ -43,9 +44,26 @@ func TestValidatePartialSupabaseFails(t *testing.T) {
 	}
 }
 
+func TestValidateSupabaseDisabledIgnoresPartialFields(t *testing.T) {
+	cfg := &config.Config{
+		Supabase: config.SupabaseConfig{
+			Enabled: false,
+			Host:    "db.example.com",
+			Port:    "5432",
+		},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+	if cfg.Supabase.Configured() {
+		t.Fatal("expected supabase not configured when disabled")
+	}
+}
+
 func TestValidateCompleteSupabaseOK(t *testing.T) {
 	cfg := &config.Config{
 		Supabase: config.SupabaseConfig{
+			Enabled:  true,
 			Host:     "db.example.com",
 			Port:     "5432",
 			Name:     "postgres",
@@ -62,6 +80,7 @@ func TestValidateCompleteSupabaseOK(t *testing.T) {
 func TestSupabaseDSNEncodesPassword(t *testing.T) {
 	cfg := &config.Config{
 		Supabase: config.SupabaseConfig{
+			Enabled:  true,
 			Host:     "db.example.com",
 			Port:     "5432",
 			Name:     "postgres",

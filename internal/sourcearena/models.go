@@ -139,10 +139,24 @@ func decodeSymbols(raw json.RawMessage) ([]SymbolQuote, error) {
 
 func decodeCandles(raw json.RawMessage) ([]Candle, error) {
 	var list []Candle
-	if err := json.Unmarshal(raw, &list); err != nil {
+	if err := json.Unmarshal(raw, &list); err == nil {
+		return list, nil
+	}
+	var wrapped map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &wrapped); err != nil {
 		return nil, fmt.Errorf("decode candles: %w", err)
 	}
-	return list, nil
+	for _, key := range []string{"data", "results", "items", "candles"} {
+		if payload, ok := wrapped[key]; ok {
+			if err := json.Unmarshal(payload, &list); err == nil {
+				return list, nil
+			}
+		}
+	}
+	if msg, ok := wrapped["message"]; ok {
+		return nil, NewAPIError("candles", 0, strings.Trim(string(msg), `"`))
+	}
+	return nil, fmt.Errorf("decode candles: unexpected payload")
 }
 
 func wiresToOptions(wires []optionWire) []Option {
