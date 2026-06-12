@@ -28,8 +28,12 @@ func TestDashboardPageRenders(t *testing.T) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	body, _ := io.ReadAll(rec.Body)
-	if !strings.Contains(string(body), "AHRM") {
+	text := string(body)
+	if !strings.Contains(text, "AHRM") {
 		t.Fatalf("unexpected body: %s", body)
+	}
+	if !strings.Contains(text, "آخرین به‌روزرسانی") || !strings.Contains(text, "(ایران)") {
+		t.Fatalf("expected Iran update bar in body")
 	}
 }
 
@@ -58,4 +62,23 @@ func TestSnapshotCache(t *testing.T) {
 		}
 	}
 	_ = time.Second
+}
+
+func TestMatrixPageRenders(t *testing.T) {
+	cfg := &config.Config{}
+	scan := scanner.NewService(cfg, nil, nil, nil)
+	srv := server.New(cfg, nil, slog.Default(), "migrations", false, scan)
+
+	req := httptest.NewRequest(http.MethodGet, "/matrix", nil)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	body, _ := io.ReadAll(rec.Body)
+	text := string(body)
+	if !strings.Contains(text, "AHRM") {
+		t.Fatalf("unexpected body: %s", body)
+	}
 }

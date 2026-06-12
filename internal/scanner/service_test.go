@@ -59,8 +59,17 @@ func TestRefreshWithMockAPI(t *testing.T) {
 	if len(snap.Opportunities) == 0 {
 		t.Fatalf("expected opportunities from fixture pair")
 	}
+	if len(snap.CallMatrices) < 1 {
+		t.Fatalf("expected call matrices from fixture, got %d", len(snap.CallMatrices))
+	}
+	if len(snap.PutMatrices) < 1 {
+		t.Fatalf("expected put matrices from fixture, got %d", len(snap.PutMatrices))
+	}
 	b, _ := json.Marshal(snap.Opportunities[0])
 	if len(b) == 0 {
 		t.Fatal("empty opp")
+	}
+	if snap.ImpliedVolatility == nil {
+		t.Fatal("ImpliedVolatility should be populated")
 	}
 }

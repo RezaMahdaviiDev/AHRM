@@ -73,12 +73,12 @@ func TestClientAPIError(t *testing.T) {
 }
 
 func TestDecodeOptionsStringNumbers(t *testing.T) {
-	payload := `[{"name":"ضهرم3023","close_price":13500,"close_price_change_percent":"24.56","emal_price":26000,"to_date":"1405/03/27","basis_name":"اهرم","op":"90068","1_sell_volume":"7152","1_buy_volume":"32640691"}]`
+	payload := `[{"name":"ضهرم3023","close_price":13500,"close_price_change_percent":"24.56","emal_price":26000,"to_date":"1405/03/27","basis_name":"اهرم","op":"90068","1_sell_volume":"7152","1_buy_volume":"32640691","trade_volume":"12345"}]`
 	opts, err := sourcearena.DecodeOptionsForTest([]byte(payload))
 	if err != nil {
 		t.Fatalf("DecodeOptionsForTest() error = %v", err)
 	}
-	if len(opts) != 1 || opts[0].OpenPosition != 90068 || opts[0].SellRow1Volume != 7152 || opts[0].BuyRow1Volume != 32640691 {
+	if len(opts) != 1 || opts[0].OpenPosition != 90068 || opts[0].SellRow1Volume != 7152 || opts[0].BuyRow1Volume != 32640691 || opts[0].TradeVolume != 12345 {
 		t.Fatalf("got %+v", opts)
 	}
 }

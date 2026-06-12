@@ -2,11 +2,13 @@
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="{{.RefreshSeconds}}">
   <title>{{.Title}} | AHRM</title>
   <style>
     body { font-family: Tahoma, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
     header { background: #1e293b; padding: 1rem 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
     header a { color: #93c5fd; text-decoration: none; }
+    .update-bar { background: #1e293b; padding: 0.5rem 2rem; font-size: 0.9rem; color: #94a3b8; border-bottom: 1px solid #334155; }
     main { padding: 1.5rem 2rem; }
     .card { background: #1e293b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
     .alert-high { color: #f87171; }
@@ -23,10 +25,11 @@
     <a href="/hv">HV</a>
     <a href="/market">بازار</a>
     <a href="/matrix">ماتریس</a>
+    <a href="/covered-call">کاوردکال</a>
   </header>
+  <div class="update-bar">آخرین به‌روزرسانی: {{.LastUpdatedTehran}} (ایران) · رفرش خودکار هر {{.RefreshMinutes}} دقیقه</div>
   <main>
     <h1>شاخص‌های بازار</h1>
-    <p class="muted">زمان: {{.Snapshot.GeneratedAt.Format "2006-01-02 15:04:05"}} UTC</p>
 
     <div class="card">
       <h3>Breadth Thrust</h3>
@@ -41,7 +44,7 @@
       <p>امروز: {{printf "%.4f" .Snapshot.AdvanceDecline.CurrentValue}}</p>
       <p>میانگین ۱۰ روز: {{printf "%.4f" .Snapshot.AdvanceDecline.Average10Day}}</p>
       <p>وضعیت: <span class="alert-{{.Snapshot.AdvanceDecline.AlertState}}">{{if .Snapshot.AdvanceDecline.AlertState}}{{.Snapshot.AdvanceDecline.AlertState}}{{else}}—{{end}}</span></p>
-      <p class="muted">آستانه بالا: 2.0 | آستانه پایین: 0.8</p>
+      <p class="muted">آستانه بالا: 1.4 | آستانه پایین: 0.6</p>
     </div>
 
     {{if and (eq .Snapshot.Breadth.Average10Day 0.0) (eq .Snapshot.Breadth.CurrentValue 0.0)}}

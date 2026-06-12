@@ -18,6 +18,7 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("SOURCEARENA_API_TOKEN", "")
 	t.Setenv("TELEGRAM_BOT_TOKEN", "")
 	t.Setenv("TELEGRAM_CHAT_ID", "")
+	t.Setenv("RISK_FREE_RATE", "")
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
@@ -28,6 +29,12 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.LogLevel != "info" {
 		t.Fatalf("LogLevel = %q, want info", cfg.LogLevel)
+	}
+	if cfg.RiskFreeRate != 0.20 {
+		t.Fatalf("RiskFreeRate = %v, want 0.20", cfg.RiskFreeRate)
+	}
+	if cfg.SnapshotRefreshSeconds != 180 {
+		t.Fatalf("SnapshotRefreshSeconds = %v, want 180", cfg.SnapshotRefreshSeconds)
 	}
 }
 

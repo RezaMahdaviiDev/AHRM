@@ -64,6 +64,11 @@ func (e *Engine) MaybeSendAdvanceDecline(ctx context.Context, avg float64, state
 	return e.send(ctx, "advance_decline", key, fmt.Sprintf("Advance/Decline alert=%s avg10=%.4f", state, avg))
 }
 
+func (e *Engine) MaybeSendMatrixAlert(ctx context.Context, ruleID string, diff float64, message string) (bool, error) {
+	key := fmt.Sprintf("matrix:%s:%.0f", ruleID, diff)
+	return e.send(ctx, "matrix", key, message)
+}
+
 func (e *Engine) send(ctx context.Context, alertType, key, message string) (bool, error) {
 	if e.sender == nil {
 		return false, fmt.Errorf("telegram sender not configured")

@@ -8,11 +8,14 @@ import (
 	"ahrm/internal/alerts"
 	"ahrm/internal/arbitrage"
 	"ahrm/internal/config"
+	"ahrm/internal/coveredcall"
 	"ahrm/internal/domain"
 	"ahrm/internal/hv"
 	"ahrm/internal/indicators"
+	"ahrm/internal/ivcalc"
 	"ahrm/internal/market"
 	"ahrm/internal/matrix"
+	"ahrm/internal/matrixalerts"
 	"ahrm/internal/pairs"
 	"ahrm/internal/sourcearena"
 )
@@ -23,13 +26,16 @@ type Service struct {
 	cfg        *config.Config
 	client     *sourcearena.Client
 	marketStore *market.Store
-	pairEngine *pairs.Engine
-	arbEngine  *arbitrage.Engine
-	hvEngine   *hv.Engine
+	pairEngine        *pairs.Engine
+	arbEngine         *arbitrage.Engine
+	coveredCallEngine *coveredcall.Engine
+	ivEngine          *ivcalc.Engine
+	hvEngine          *hv.Engine
 	breadth    *indicators.BreadthEngine
 	advance    *indicators.AdvanceDeclineEngine
-	matrix     *matrix.Engine
-	alerts     *alerts.Engine
+	matrix      *matrix.Engine
+	matrixRules []matrixalerts.Rule
+	alerts      *alerts.Engine
 }
 
 type HVFetch struct {
@@ -49,19 +55,24 @@ type Snapshot struct {
 	Breadth       indicators.IndicatorResult   `json:"breadth"`
 	AdvanceDecline indicators.IndicatorResult  `json:"advance_decline"`
 	Opportunities []arbitrage.Opportunity      `json:"opportunities"`
-	CallMatrix    matrix.Matrix                `json:"call_matrix"`
-	PutMatrix     matrix.Matrix                `json:"put_matrix"`
+	CoveredCalls      []coveredcall.CoveredCall    `json:"covered_calls"`
+	ImpliedVolatility []ivcalc.IVResult            `json:"implied_volatility"`
+	CallMatrices      []matrix.Matrix              `json:"call_matrices"`
+	PutMatrices   []matrix.Matrix              `json:"put_matrices"`
 	Errors        []string                     `json:"errors,omitempty"`
 }
 
 func NewService(cfg *config.Config, client *sourcearena.Client, marketStore *market.Store, alertEngine *alerts.Engine) *Service {
+	matrixRules, _ := matrixalerts.LoadRules(cfg.MatrixAlertsFile)
 	return &Service{
 		cfg:         cfg,
 		client:      client,
 		marketStore: marketStore,
-		pairEngine:  pairs.NewEngine(),
-		arbEngine:   arbitrage.NewEngine(),
-		hvEngine:    hv.NewEngine(),
+		pairEngine:        pairs.NewEngine(),
+		arbEngine:         arbitrage.NewEngine(),
+		coveredCallEngine: coveredcall.NewEngine(),
+		ivEngine:          ivcalc.NewEngine(),
+		hvEngine:          hv.NewEngine(),
 		breadth: indicators.NewBreadthEngine(indicators.Thresholds{
 			High: cfg.Alerts.BreadthHighThreshold,
 			Low:  cfg.Alerts.BreadthLowThreshold,
@@ -70,8 +81,9 @@ func NewService(cfg *config.Config, client *sourcearena.Client, marketStore *mar
 			High: cfg.Alerts.AdvanceHighThreshold,
 			Low:  cfg.Alerts.AdvanceLowThreshold,
 		}),
-		matrix: matrix.NewEngine(),
-		alerts: alertEngine,
+		matrix:      matrix.NewEngine(),
+		matrixRules: matrixRules,
+		alerts:      alertEngine,
 	}
 }
 
@@ -146,6 +158,19 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 	}
 
 	if len(options) > 0 {
+		if snap.Underlying.ClosePrice > 0 {
+			covered, ccErr := s.coveredCallEngine.CalculateAll(options, snap.Underlying.ClosePrice)
+			if ccErr != nil {
+				snap.Errors = append(snap.Errors, fmt.Sprintf("covered_call: %v", ccErr))
+			} else {
+				snap.CoveredCalls = covered
+			}
+			ivResults, ivErrs := s.ivEngine.CalculateAll(options, snap.Underlying.ClosePrice, s.cfg.RiskFreeRate)
+			snap.ImpliedVolatility = ivResults
+			for _, msg := range ivErrs {
+				snap.Errors = append(snap.Errors, msg)
+			}
+		}
 		if matched, pErr := s.pairEngine.Match(options); pErr == nil {
 			opps, _ := s.arbEngine.CalculateAll(matched, snap.Underlying.ClosePrice)
 			snap.Opportunities = opps
@@ -159,11 +184,27 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		} else {
 			snap.Errors = append(snap.Errors, fmt.Sprintf("pairs: %v", pErr))
 		}
-		if callMatrix, err := s.matrix.BuildCalls(options); err == nil {
-			snap.CallMatrix = callMatrix
+		if callMatrices, err := s.matrix.BuildCalls(options); err == nil {
+			snap.CallMatrices = callMatrices
 		}
-		if putMatrix, err := s.matrix.BuildPuts(options); err == nil {
-			snap.PutMatrix = putMatrix
+		if putMatrices, err := s.matrix.BuildPuts(options); err == nil {
+			snap.PutMatrices = putMatrices
+		}
+
+		prices := make(map[string]float64, len(options))
+		for _, opt := range options {
+			prices[opt.Name] = opt.ClosePrice
+		}
+		for _, rule := range s.matrixRules {
+			priceA, okA := prices[rule.SymbolA]
+			priceB, okB := prices[rule.SymbolB]
+			if !okA || !okB {
+				continue
+			}
+			diff, triggered := rule.Evaluate(priceA, priceB)
+			if triggered && s.alerts != nil {
+				_, _ = s.alerts.MaybeSendMatrixAlert(ctx, rule.ID, diff, rule.Message)
+			}
 		}
 	}
 

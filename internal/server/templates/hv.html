@@ -2,12 +2,14 @@
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="{{.RefreshSeconds}}">
   <title>{{.Title}} | AHRM</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Tahoma, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
     header { background: #1e293b; padding: 1rem 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
     header a { color: #93c5fd; text-decoration: none; }
+    .update-bar { background: #1e293b; padding: 0.5rem 2rem; font-size: 0.9rem; color: #94a3b8; border-bottom: 1px solid #334155; }
     main { padding: 1.5rem 2rem; }
     .card { background: #1e293b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
     .muted { color: #94a3b8; font-size: 0.9rem; }
@@ -16,6 +18,11 @@
     .metric { font-size: 1.6rem; font-weight: bold; color: #34d399; }
     table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 0.5rem; }
     th, td { border: 1px solid #334155; padding: 0.35rem; text-align: center; }
+    th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    th.sortable:hover { background: #1e293b; }
+    th.sortable .sort-icon { margin-right: 0.35rem; opacity: 0.45; font-size: 0.75rem; }
+    th.sortable.active .sort-icon { opacity: 1; color: #93c5fd; }
+    tr:nth-child(even) { background: #172033; }
     .errors { color: #fca5a5; }
   </style>
 </head>
@@ -27,10 +34,11 @@
     <a href="/hv">HV</a>
     <a href="/market">بازار</a>
     <a href="/matrix">ماتریس</a>
+    <a href="/covered-call">کاوردکال</a>
   </header>
+  <div class="update-bar">آخرین به‌روزرسانی: {{.LastUpdatedTehran}} (ایران) · رفرش خودکار هر {{.RefreshMinutes}} دقیقه</div>
   <main>
     <h1>Historical Volatility — {{.Snapshot.HVFetch.Symbol}}</h1>
-    <p class="muted">زمان: {{.Snapshot.GeneratedAt.Format "2006-01-02 15:04:05"}} UTC</p>
 
     <div class="grid">
       <div class="card">
@@ -127,6 +135,39 @@
     </div>
     {{end}}
 
+    <div class="card">
+      <strong>نوسان ضمنی آپشن‌ها (IV)</strong>
+      <p class="muted" style="margin-top:0.5rem">
+        call با سررسید بیش از ۳۰ روز — Black-Scholes (bisection)، نرخ بدون‌ریسک از <code>RISK_FREE_RATE</code>
+      </p>
+      <table id="iv-table">
+        <thead>
+          <tr>
+            <th class="sortable" data-col="0" data-type="text">نماد <span class="sort-icon"></span></th>
+            <th class="sortable" data-col="1" data-type="date">سررسید <span class="sort-icon"></span></th>
+            <th class="sortable" data-col="2" data-type="number">روز تا سررسید <span class="sort-icon"></span></th>
+            <th class="sortable" data-col="3" data-type="number">قیمت اعمال (K) <span class="sort-icon"></span></th>
+            <th class="sortable" data-col="4" data-type="number">قیمت آپشن (C) <span class="sort-icon"></span></th>
+            <th class="sortable" data-col="5" data-type="number">IV % <span class="sort-icon"></span></th>
+          </tr>
+        </thead>
+        <tbody id="iv-body">
+        {{range .Snapshot.ImpliedVolatility}}
+        <tr>
+          <td>{{.Symbol}}</td>
+          <td data-value="{{.Expiry}}">{{.Expiry}}</td>
+          <td data-value="{{.DaysToExpiry}}">{{.DaysToExpiry}}</td>
+          <td data-value="{{printf "%.0f" .Strike}}">{{printf "%.0f" .Strike}}</td>
+          <td data-value="{{printf "%.0f" .OptionPrice}}">{{printf "%.0f" .OptionPrice}}</td>
+          <td data-value="{{printf "%.4f" .IVPct}}">{{printf "%.2f" .IVPct}}%</td>
+        </tr>
+        {{else}}
+        <tr class="empty-row"><td colspan="6">آپشن call واجد شرایط برای IV یافت نشد.</td></tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+
     {{if .Snapshot.Errors}}
     <div class="card errors">
       <strong>خطاها</strong>
@@ -134,5 +175,73 @@
     </div>
     {{end}}
   </main>
+  <script>
+    (function () {
+      const tbody = document.getElementById('iv-body');
+      const headers = document.querySelectorAll('#iv-table th.sortable');
+      if (!tbody || headers.length === 0) return;
+
+      const rows = Array.from(tbody.querySelectorAll('tr:not(.empty-row)'));
+      if (rows.length === 0) return;
+
+      let activeCol = null;
+      let asc = true;
+
+      function parseDate(s) {
+        const parts = String(s).trim().split('/');
+        if (parts.length !== 3) return 0;
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const d = parseInt(parts[2], 10);
+        return (y * 10000) + (m * 100) + d;
+      }
+
+      function cellValue(row, col, type) {
+        const cell = row.children[col];
+        if (!cell) return '';
+        const raw = cell.dataset.value !== undefined ? cell.dataset.value : cell.textContent;
+        if (type === 'number') return parseFloat(raw) || 0;
+        if (type === 'date') return parseDate(raw);
+        return String(raw).trim();
+      }
+
+      function compare(a, b, type) {
+        if (type === 'number' || type === 'date') return a - b;
+        return String(a).localeCompare(String(b), 'fa');
+      }
+
+      function updateIcons(th, dir) {
+        headers.forEach(h => {
+          h.classList.remove('active');
+          const icon = h.querySelector('.sort-icon');
+          if (icon) icon.textContent = '';
+        });
+        th.classList.add('active');
+        const icon = th.querySelector('.sort-icon');
+        if (icon) icon.textContent = dir === 'asc' ? '▲' : '▼';
+      }
+
+      headers.forEach(th => {
+        th.addEventListener('click', function () {
+          const col = parseInt(th.dataset.col, 10);
+          const type = th.dataset.type || 'text';
+          if (activeCol === col) {
+            asc = !asc;
+          } else {
+            activeCol = col;
+            asc = true;
+          }
+          const sorted = rows.slice().sort((ra, rb) => {
+            const va = cellValue(ra, col, type);
+            const vb = cellValue(rb, col, type);
+            const c = compare(va, vb, type);
+            return asc ? c : -c;
+          });
+          sorted.forEach(r => tbody.appendChild(r));
+          updateIcons(th, asc ? 'asc' : 'desc');
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

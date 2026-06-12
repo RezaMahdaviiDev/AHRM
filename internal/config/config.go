@@ -11,12 +11,15 @@ import (
 )
 
 type Config struct {
-	HTTPAddr    string
-	LogLevel    string
-	Supabase    SupabaseConfig
-	SourceArena SourceArenaConfig
-	Telegram    TelegramConfig
-	Alerts      AlertsConfig
+	HTTPAddr         string
+	LogLevel         string
+	MatrixAlertsFile string
+	RiskFreeRate            float64
+	SnapshotRefreshSeconds  int
+	Supabase                SupabaseConfig
+	SourceArena      SourceArenaConfig
+	Telegram         TelegramConfig
+	Alerts           AlertsConfig
 }
 
 type AlertsConfig struct {
@@ -107,8 +110,11 @@ func loadEnvFiles() {
 
 func LoadFromEnv() (*Config, error) {
 	cfg := &Config{
-		HTTPAddr: getenv("HTTP_ADDR", ":8080"),
-		LogLevel: getenv("LOG_LEVEL", "info"),
+		HTTPAddr:         getenv("HTTP_ADDR", ":8080"),
+		LogLevel:         getenv("LOG_LEVEL", "info"),
+		MatrixAlertsFile: getenv("MATRIX_ALERTS_FILE", "configs/matrix_alerts.json"),
+		RiskFreeRate:           parseFloatEnv("RISK_FREE_RATE", 0.20),
+		SnapshotRefreshSeconds: parseIntEnv("SNAPSHOT_REFRESH_SECONDS", 180),
 		Supabase: SupabaseConfig{
 			Enabled:  parseBoolEnv("SUPABASE_ENABLED", false),
 			Host:     strings.TrimSpace(os.Getenv("SUPABASE_DB_HOST")),
@@ -130,8 +136,8 @@ func LoadFromEnv() (*Config, error) {
 			ArbitrageRThreshold:  parseFloatEnv("ALERT_ARBITRAGE_R_THRESHOLD", 0),
 			BreadthHighThreshold: parseFloatEnv("ALERT_BREADTH_HIGH", 0.618),
 			BreadthLowThreshold:  parseFloatEnv("ALERT_BREADTH_LOW", 0.4),
-			AdvanceHighThreshold: parseFloatEnv("ALERT_ADVANCE_HIGH", 2.0),
-			AdvanceLowThreshold:  parseFloatEnv("ALERT_ADVANCE_LOW", 0.8),
+			AdvanceHighThreshold: parseFloatEnv("ALERT_ADVANCE_HIGH", 1.4),
+			AdvanceLowThreshold:  parseFloatEnv("ALERT_ADVANCE_LOW", 0.6),
 		},
 	}
 	return cfg, cfg.Validate()
@@ -261,6 +267,18 @@ func parseFloatEnv(key string, fallback float64) float64 {
 	}
 	var value float64
 	if _, err := fmt.Sscanf(raw, "%f", &value); err != nil {
+		return fallback
+	}
+	return value
+}
+
+func parseIntEnv(key string, fallback int) int {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	var value int
+	if _, err := fmt.Sscanf(raw, "%d", &value); err != nil {
 		return fallback
 	}
 	return value

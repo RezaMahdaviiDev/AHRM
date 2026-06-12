@@ -13,9 +13,22 @@ import (
 //go:embed templates/*.html
 var templateFS embed.FS
 
+var tehranLocation = loadTehranLocation()
+
+func loadTehranLocation() *time.Location {
+	loc, err := time.LoadLocation("Asia/Tehran")
+	if err != nil {
+		return time.FixedZone("IRST", 3*3600+30*60)
+	}
+	return loc
+}
+
 type pageData struct {
-	Title    string
-	Snapshot scanner.Snapshot
+	Title             string
+	Snapshot          scanner.Snapshot
+	RefreshSeconds    int
+	RefreshMinutes    int
+	LastUpdatedTehran string
 }
 
 func (s *Server) registerPages(mux *http.ServeMux) {
@@ -24,6 +37,7 @@ func (s *Server) registerPages(mux *http.ServeMux) {
 	mux.HandleFunc("GET /arbitrage", s.pageHandler("arbitrage.html", "Arbitrage"))
 	mux.HandleFunc("GET /hv", s.pageHandler("hv.html", "HV"))
 	mux.HandleFunc("GET /market", s.pageHandler("market.html", "Market"))
+	mux.HandleFunc("GET /covered-call", s.pageHandler("covered-call.html", "Covered Call"))
 	mux.HandleFunc("GET /matrix", s.pageHandler("matrix.html", "Matrix"))
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dashboard", http.StatusFound)
@@ -42,7 +56,13 @@ func (s *Server) initTemplates() {
 func (s *Server) pageHandler(name, title string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		snap := s.getSnapshot(r.Context())
-		data := pageData{Title: title, Snapshot: snap}
+		data := pageData{
+			Title:             title,
+			Snapshot:          snap,
+			RefreshSeconds:    s.refreshSeconds,
+			RefreshMinutes:    (s.refreshSeconds + 59) / 60,
+			LastUpdatedTehran: formatTehran(snap.GeneratedAt),
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if s.templates == nil {
 			http.Error(w, "templates not loaded", http.StatusInternalServerError)
@@ -54,12 +74,20 @@ func (s *Server) pageHandler(name, title string) http.HandlerFunc {
 	}
 }
 
+func formatTehran(t time.Time) string {
+	if t.IsZero() {
+		return "—"
+	}
+	return t.In(tehranLocation).Format("2006/01/02 15:04:05")
+}
+
 func (s *Server) getSnapshot(ctx context.Context) scanner.Snapshot {
 	if s.scanner == nil {
 		return scanner.Snapshot{GeneratedAt: time.Now().UTC()}
 	}
+	ttl := s.cacheTTL()
 	s.snapMu.RLock()
-	if time.Since(s.snapAt) < 60*time.Second && !s.snapAt.IsZero() {
+	if time.Since(s.snapAt) < ttl && !s.snapAt.IsZero() {
 		snap := s.snapCache
 		s.snapMu.RUnlock()
 		return snap
@@ -68,7 +96,7 @@ func (s *Server) getSnapshot(ctx context.Context) scanner.Snapshot {
 
 	s.snapMu.Lock()
 	defer s.snapMu.Unlock()
-	if time.Since(s.snapAt) < 60*time.Second && !s.snapAt.IsZero() {
+	if time.Since(s.snapAt) < ttl && !s.snapAt.IsZero() {
 		return s.snapCache
 	}
 	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)

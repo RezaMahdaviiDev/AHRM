@@ -50,3 +50,25 @@ func TestThresholdCheck(t *testing.T) {
 		t.Fatal("expected no alert below threshold")
 	}
 }
+
+func TestMatrixAlertDuplicateProtection(t *testing.T) {
+	sender := &fakeSender{}
+	engine := alerts.NewEngine(alerts.Config{}, sender, alerts.NewStore(nil))
+	sent, err := engine.MaybeSendMatrixAlert(context.Background(), "rule1", 1200, "test alert")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sent {
+		t.Fatal("expected alert sent")
+	}
+	sent, err = engine.MaybeSendMatrixAlert(context.Background(), "rule1", 1200, "test alert")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sent {
+		t.Fatal("expected duplicate suppressed")
+	}
+	if len(sender.messages) != 1 {
+		t.Fatalf("messages=%d", len(sender.messages))
+	}
+}

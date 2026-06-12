@@ -9,6 +9,7 @@
     "basis_price_percent": 1.2,
     "op": 100,
     "trade_value": 5000000,
+    "trade_volume": 15000,
     "lowest_price": 1400,
     "highest_price": 1600
   },
@@ -22,6 +23,7 @@
     "basis_price_percent": 1.2,
     "op": 90,
     "trade_value": 3000000,
+    "trade_volume": 8000,
     "lowest_price": 750,
     "highest_price": 850
   },
@@ -35,6 +37,7 @@
     "basis_price_percent": 0.5,
     "op": 50,
     "trade_value": 1000000,
+    "trade_volume": 4200,
     "lowest_price": 1100,
     "highest_price": 1250
   }

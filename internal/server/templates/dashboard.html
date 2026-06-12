@@ -2,12 +2,14 @@
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="{{.RefreshSeconds}}">
   <title>{{.Title}} | AHRM</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Tahoma, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
     header { background: #1e293b; padding: 1rem 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
     header a { color: #93c5fd; text-decoration: none; }
+    .update-bar { background: #1e293b; padding: 0.5rem 2rem; font-size: 0.9rem; color: #94a3b8; border-bottom: 1px solid #334155; }
     main { padding: 1.5rem 2rem; }
     .card { background: #1e293b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
   </style>
@@ -20,11 +22,12 @@
     <a href="/hv">HV</a>
     <a href="/market">بازار</a>
     <a href="/matrix">ماتریس</a>
+    <a href="/covered-call">کاوردکال</a>
   </header>
+  <div class="update-bar">آخرین به‌روزرسانی: {{.LastUpdatedTehran}} (ایران) · رفرش خودکار هر {{.RefreshMinutes}} دقیقه</div>
   <main>
     <h1>داشبورد AHRM</h1>
     <div class="card">
-      <p>زمان: {{.Snapshot.GeneratedAt.Format "2006-01-02 15:04:05"}} UTC</p>
       <p>قیمت {{.Snapshot.Underlying.Name}}: {{printf "%.0f" .Snapshot.Underlying.ClosePrice}}</p>
       <p>HV: {{printf "%.2f" .Snapshot.HV.HVPct}}%</p>
       <p>Breadth 10d: {{printf "%.4f" .Snapshot.Breadth.Average10Day}} ({{.Snapshot.Breadth.AlertState}})</p>

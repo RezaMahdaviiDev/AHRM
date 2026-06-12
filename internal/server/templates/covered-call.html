@@ -20,6 +20,7 @@
     tr:nth-child(even) { background: #172033; }
     .muted { color: #94a3b8; }
     .positive { color: #86efac; }
+    .negative { color: #f87171; }
   </style>
 </head>
 <body>
@@ -34,38 +35,40 @@
   </header>
   <div class="update-bar">آخرین به‌روزرسانی: {{.LastUpdatedTehran}} (ایران) · رفرش خودکار هر {{.RefreshMinutes}} دقیقه</div>
   <main>
-    <h1>فرصت‌های آربیتراژ</h1>
+    <h1>کاورد کال</h1>
     <p class="muted">
       قیمت {{.Snapshot.Underlying.Name}}: {{printf "%.0f" .Snapshot.Underlying.ClosePrice}} |
-      تعداد: {{len .Snapshot.Opportunities}}
+      تعداد: {{len .Snapshot.CoveredCalls}}
     </p>
-    <table id="arb-table">
+    <table id="cc-table">
       <thead>
         <tr>
           <th class="sortable" data-col="0" data-type="text">نماد <span class="sort-icon"></span></th>
-          <th class="sortable" data-col="1" data-type="number">حجم معامله شده <span class="sort-icon"></span></th>
-          <th class="sortable" data-col="2" data-type="date">سررسید <span class="sort-icon"></span></th>
-          <th class="sortable" data-col="3" data-type="number">اعمال <span class="sort-icon"></span></th>
-          <th class="sortable" data-col="4" data-type="number">R% <span class="sort-icon"></span></th>
-          <th class="sortable" data-col="5" data-type="number">Call <span class="sort-icon"></span></th>
-          <th class="sortable" data-col="6" data-type="number">Put <span class="sort-icon"></span></th>
-          <th class="sortable" data-col="7" data-type="number">سرمایه <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="1" data-type="date">سررسید <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="2" data-type="number">روز تا سررسید <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="3" data-type="number">قیمت سهم (S) <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="4" data-type="number">قیمت آپشن (C) <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="5" data-type="number">قیمت اعمال (K) <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="6" data-type="number">هزینه خالص (Net Cost) <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="7" data-type="number">Static ROI % <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="8" data-type="number">Max ROI % <span class="sort-icon"></span></th>
         </tr>
       </thead>
-      <tbody id="arb-body">
-      {{range .Snapshot.Opportunities}}
+      <tbody id="cc-body">
+      {{range .Snapshot.CoveredCalls}}
       <tr>
         <td>{{.Symbol}}</td>
-        <td data-value="{{printf "%.0f" .TradeVolume}}">{{printf "%.0f" .TradeVolume}}</td>
         <td data-value="{{.Expiry}}">{{.Expiry}}</td>
+        <td data-value="{{.DaysToExpiry}}">{{.DaysToExpiry}}</td>
+        <td data-value="{{printf "%.0f" .Underlying}}">{{printf "%.0f" .Underlying}}</td>
+        <td data-value="{{printf "%.0f" .OptionPrice}}">{{printf "%.0f" .OptionPrice}}</td>
         <td data-value="{{printf "%.0f" .Strike}}">{{printf "%.0f" .Strike}}</td>
-        <td class="positive" data-value="{{printf "%.4f" .ReturnPct}}">{{printf "%.2f" .ReturnPct}}</td>
-        <td data-value="{{printf "%.0f" .CallPrice}}">{{printf "%.0f" .CallPrice}}</td>
-        <td data-value="{{printf "%.0f" .PutPrice}}">{{printf "%.0f" .PutPrice}}</td>
-        <td data-value="{{printf "%.0f" .Capital}}">{{printf "%.0f" .Capital}}</td>
+        <td data-value="{{printf "%.0f" .NetCost}}">{{printf "%.0f" .NetCost}}</td>
+        <td data-value="{{printf "%.4f" .StaticROIPct}}">{{printf "%.2f" .StaticROIPct}}</td>
+        <td class="{{if lt .MaxROIPct 0.0}}negative{{else}}positive{{end}}" data-value="{{printf "%.4f" .MaxROIPct}}">{{printf "%.2f" .MaxROIPct}}</td>
       </tr>
       {{else}}
-      <tr class="empty-row"><td colspan="8">بدون فرصت آربیتراژ — snapshot در حال بارگذاری است یا جفت call/put واجد شرایط نیست.</td></tr>
+      <tr class="empty-row"><td colspan="9">بدون کاورد کال — call با سررسید بیش از ۳۰ روز یافت نشد.</td></tr>
       {{end}}
       </tbody>
     </table>
@@ -77,8 +80,8 @@
   </main>
   <script>
     (function () {
-      const tbody = document.getElementById('arb-body');
-      const headers = document.querySelectorAll('#arb-table th.sortable');
+      const tbody = document.getElementById('cc-body');
+      const headers = document.querySelectorAll('#cc-table th.sortable');
       if (!tbody || headers.length === 0) return;
 
       const rows = Array.from(tbody.querySelectorAll('tr:not(.empty-row)'));

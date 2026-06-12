@@ -16,27 +16,35 @@ import (
 )
 
 type Server struct {
-	cfg        *config.Config
-	pool       *pgxpool.Pool
-	logger     *slog.Logger
-	migrations string
-	dbReady    bool
-	scanner    *scanner.Service
-	templates  *template.Template
-	tplOnce    sync.Once
-	snapMu     sync.RWMutex
-	snapCache  scanner.Snapshot
-	snapAt     time.Time
+	cfg              *config.Config
+	pool             *pgxpool.Pool
+	logger           *slog.Logger
+	migrations       string
+	dbReady          bool
+	scanner          *scanner.Service
+	templates        *template.Template
+	tplOnce          sync.Once
+	snapMu           sync.RWMutex
+	snapCache        scanner.Snapshot
+	snapAt           time.Time
+	refreshInterval  time.Duration
+	refreshSeconds   int
 }
 
 func New(cfg *config.Config, pool *pgxpool.Pool, logger *slog.Logger, migrationsDir string, dbReady bool, scan *scanner.Service) *Server {
+	secs := cfg.SnapshotRefreshSeconds
+	if secs <= 0 {
+		secs = 180
+	}
 	return &Server{
-		cfg:        cfg,
-		pool:       pool,
-		logger:     logger,
-		migrations: migrationsDir,
-		dbReady:    dbReady,
-		scanner:    scan,
+		cfg:             cfg,
+		pool:            pool,
+		logger:          logger,
+		migrations:      migrationsDir,
+		dbReady:         dbReady,
+		scanner:         scan,
+		refreshInterval: time.Duration(secs) * time.Second,
+		refreshSeconds:  secs,
 	}
 }
 

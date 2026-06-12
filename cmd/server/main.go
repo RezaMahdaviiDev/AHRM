@@ -80,6 +80,11 @@ func main() {
 
 	dbReady := pool != nil
 	srv := server.New(cfg, pool, logger, filepath.Join(projectRoot(), "migrations"), dbReady, scan)
+
+	refreshCtx, stopRefresh := context.WithCancel(context.Background())
+	defer stopRefresh()
+	srv.StartBackgroundRefresh(refreshCtx)
+
 	logReadiness(logger, srv.ReadinessReport())
 
 	httpServer := &http.Server{
@@ -109,6 +114,8 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
+
+	stopRefresh()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

@@ -30,6 +30,7 @@ type optionWire struct {
 	SellRow1Volume      flexFloat `json:"1_sell_volume"`
 	BuyRow1Volume       flexFloat `json:"1_buy_volume"`
 	TradeValue          flexFloat `json:"trade_value"`
+	TradeVolume         flexFloat `json:"trade_volume"`
 	LowestPrice         flexFloat `json:"lowest_price"`
 	HighestPrice        flexFloat `json:"highest_price"`
 	ExpiryDate          string    `json:"to_date"`
@@ -54,6 +55,7 @@ type Option struct {
 	SellRow1Volume         float64 `json:"1_sell_volume"`
 	BuyRow1Volume          float64 `json:"1_buy_volume"`
 	TradeValue             float64 `json:"trade_value"`
+	TradeVolume            float64 `json:"trade_volume"`
 	LowestPrice            float64 `json:"lowest_price"`
 	HighestPrice           float64 `json:"highest_price"`
 }
@@ -174,6 +176,7 @@ func wiresToOptions(wires []optionWire) []Option {
 			SellRow1Volume:      float64(w.SellRow1Volume),
 			BuyRow1Volume:       float64(w.BuyRow1Volume),
 			TradeValue:          float64(w.TradeValue),
+			TradeVolume:         float64(w.TradeVolume),
 			LowestPrice:         float64(w.LowestPrice),
 			HighestPrice:        float64(w.HighestPrice),
 		})
