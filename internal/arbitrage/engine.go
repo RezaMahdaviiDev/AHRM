@@ -50,7 +50,7 @@ func (e *Engine) Calculate(pair pairs.Pair, underlyingPrice float64) (Opportunit
 		Underlying: underlyingPrice,
 		Capital:    capital,
 		Spread:     spread,
-		Price12_5:  underlyingPrice * 0.125,
+		Price12_5:  call * 0.125,
 	}, nil
 }
 
