@@ -17,7 +17,7 @@ type Opportunity struct {
 	Underlying  float64 `json:"underlying"`
 	Capital     float64 `json:"capital"`
 	Spread      float64 `json:"spread"`
-	Price12_5   float64 `json:"price_12_5"`
+	ReturnPct12_5 float64 `json:"return_pct_12_5"`
 }
 
 type Engine struct{}
@@ -39,18 +39,26 @@ func (e *Engine) Calculate(pair pairs.Pair, underlyingPrice float64) (Opportunit
 		return Opportunity{}, fmt.Errorf("capital must be positive")
 	}
 	ret := ((pair.Strike - capital) / capital) * 100
+
+	s12_5 := underlyingPrice * 12.5
+	capital12_5 := s12_5 - spread
+	var ret12_5 float64
+	if capital12_5 != 0 {
+		ret12_5 = ((pair.Strike - capital12_5) / capital12_5) * 100
+	}
+
 	return Opportunity{
-		Symbol:      pair.Call.Name,
-		TradeVolume: pair.Call.TradeVolume,
-		Expiry:      pair.ExpiryLabel,
-		Strike:     pair.Strike,
-		ReturnPct:  ret,
-		CallPrice:  call,
-		PutPrice:   put,
-		Underlying: underlyingPrice,
-		Capital:    capital,
-		Spread:     spread,
-		Price12_5:  call * 0.125,
+		Symbol:        pair.Call.Name,
+		TradeVolume:   pair.Call.TradeVolume,
+		Expiry:        pair.ExpiryLabel,
+		Strike:        pair.Strike,
+		ReturnPct:     ret,
+		CallPrice:     call,
+		PutPrice:      put,
+		Underlying:    underlyingPrice,
+		Capital:       capital,
+		Spread:        spread,
+		ReturnPct12_5: ret12_5,
 	}, nil
 }
 
