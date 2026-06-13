@@ -40,7 +40,7 @@ func (e *Engine) Calculate(pair pairs.Pair, underlyingPrice float64) (Opportunit
 	}
 	ret := ((pair.Strike - capital) / capital) * 100
 
-	s12_5 := underlyingPrice * 12.5
+	s12_5 := underlyingPrice * 1.125
 	capital12_5 := s12_5 - spread
 	var ret12_5 float64
 	if capital12_5 != 0 {
