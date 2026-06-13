@@ -25,7 +25,7 @@ func TestCalculateAllFormulas(t *testing.T) {
 	if cc.NetCost != 23500 {
 		t.Fatalf("net_cost=%v", cc.NetCost)
 	}
-	wantStatic := (25000.0 / 23500.0) * 100
+	wantStatic := (1500.0 / 23500.0) * 100
 	if diff := cc.StaticROIPct - wantStatic; diff > 0.0001 || diff < -0.0001 {
 		t.Fatalf("static_roi=%v want=%v", cc.StaticROIPct, wantStatic)
 	}

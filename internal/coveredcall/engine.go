@@ -80,7 +80,7 @@ func calculate(opt sourcearena.Option, underlyingPrice float64, days int) (Cover
 		OptionPrice:  c,
 		Strike:       k,
 		NetCost:      netCost,
-		StaticROIPct: (s / netCost) * 100,
+		StaticROIPct: (c / netCost) * 100,
 		MaxROIPct:    ((k - netCost) / netCost) * 100,
 	}, true
 }
