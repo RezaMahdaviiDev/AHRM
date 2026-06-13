@@ -17,6 +17,7 @@ type Opportunity struct {
 	Underlying  float64 `json:"underlying"`
 	Capital     float64 `json:"capital"`
 	Spread      float64 `json:"spread"`
+	Price12_5   float64 `json:"price_12_5"`
 }
 
 type Engine struct{}
@@ -49,6 +50,7 @@ func (e *Engine) Calculate(pair pairs.Pair, underlyingPrice float64) (Opportunit
 		Underlying: underlyingPrice,
 		Capital:    capital,
 		Spread:     spread,
+		Price12_5:  underlyingPrice * 0.125,
 	}, nil
 }
 

@@ -50,6 +50,7 @@
           <th class="sortable" data-col="5" data-type="number">Call <span class="sort-icon"></span></th>
           <th class="sortable" data-col="6" data-type="number">Put <span class="sort-icon"></span></th>
           <th class="sortable" data-col="7" data-type="number">سرمایه <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="8" data-type="number">۱۲.۵٪ قیمت <span class="sort-icon"></span></th>
         </tr>
       </thead>
       <tbody id="arb-body">
@@ -63,9 +64,10 @@
         <td data-value="{{printf "%.0f" .CallPrice}}">{{printf "%.0f" .CallPrice}}</td>
         <td data-value="{{printf "%.0f" .PutPrice}}">{{printf "%.0f" .PutPrice}}</td>
         <td data-value="{{printf "%.0f" .Capital}}">{{printf "%.0f" .Capital}}</td>
+        <td data-value="{{printf "%.0f" .Price12_5}}">{{printf "%.0f" .Price12_5}}</td>
       </tr>
       {{else}}
-      <tr class="empty-row"><td colspan="8">بدون فرصت آربیتراژ — snapshot در حال بارگذاری است یا جفت call/put واجد شرایط نیست.</td></tr>
+      <tr class="empty-row"><td colspan="9">بدون فرصت آربیتراژ — snapshot در حال بارگذاری است یا جفت call/put واجد شرایط نیست.</td></tr>
       {{end}}
       </tbody>
     </table>

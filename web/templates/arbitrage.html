@@ -2,7 +2,7 @@
 <h1>فرصت‌های آربیتراژ</h1>
 <div class="card">
 <table>
-  <thead><tr><th>نماد</th><th>حجم معامله شده</th><th>سررسید</th><th>اعمال</th><th>R %</th><th>Call</th><th>Put</th><th>سرمایه</th></tr></thead>
+  <thead><tr><th>نماد</th><th>حجم معامله شده</th><th>سررسید</th><th>اعمال</th><th>R %</th><th>Call</th><th>Put</th><th>سرمایه</th><th>۱۲.۵٪ قیمت</th></tr></thead>
   <tbody>
   {{range .Snapshot.Opportunities}}
     <tr>
@@ -14,9 +14,10 @@
       <td>{{printf "%.0f" .CallPrice}}</td>
       <td>{{printf "%.0f" .PutPrice}}</td>
       <td>{{printf "%.0f" .Capital}}</td>
+      <td>{{printf "%.0f" .Price12_5}}</td>
     </tr>
   {{else}}
-    <tr><td colspan="8">داده‌ای یافت نشد</td></tr>
+    <tr><td colspan="9">داده‌ای یافت نشد</td></tr>
   {{end}}
   </tbody>
 </table>
