@@ -88,6 +88,6 @@ func calculate(opt sourcearena.Option, underlyingPrice float64, days int) (Cover
 		NetCost:      netCost,
 		StaticROIPct: staticROI,
 		MaxROIPct:    maxROI,
-		BreakEven:    k * (1 - staticROI/100),
+		BreakEven:    s - c,
 	}, true
 }

@@ -35,7 +35,8 @@ func TestCalculateAllFormulas(t *testing.T) {
 	if diff := cc.MaxROIPct - wantMax; diff > 0.0001 || diff < -0.0001 {
 		t.Fatalf("max_roi=%v want=%v", cc.MaxROIPct, wantMax)
 	}
-	wantBreakEven := 12000.0 * (1 - wantMax/100)
+	// Break Even = S - C = NetCost
+	wantBreakEven := 25000.0 - 1500.0
 	if diff := cc.BreakEven - wantBreakEven; diff > 0.01 || diff < -0.01 {
 		t.Fatalf("break_even=%v want=%v", cc.BreakEven, wantBreakEven)
 	}
