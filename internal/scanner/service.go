@@ -177,7 +177,10 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 			for _, opp := range opps {
 				if s.alerts != nil {
 					_, _ = s.alerts.MaybeSendArbitrage(ctx, alerts.ArbitrageAlertInput{
-						Expiry: opp.Expiry, Strike: opp.Strike, ReturnPct: opp.ReturnPct,
+						Symbol: opp.Symbol, Expiry: opp.Expiry, Strike: opp.Strike, ReturnPct: opp.ReturnPct,
+					})
+					_, _ = s.alerts.MaybeSendArbitrageR12Bale(ctx, alerts.ArbitrageAlertInput{
+						Symbol: opp.Symbol, Expiry: opp.Expiry, Strike: opp.Strike, ReturnPct: opp.ReturnPct12_5,
 					})
 				}
 			}

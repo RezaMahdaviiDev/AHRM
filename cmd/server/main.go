@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"ahrm/internal/alerts"
+	"ahrm/internal/bale"
 	"ahrm/internal/config"
 	"ahrm/internal/db"
 	"ahrm/internal/market"
@@ -68,13 +69,18 @@ func main() {
 	if cfg.Telegram.Configured() {
 		tgSender = telegram.NewClient(cfg.Telegram)
 	}
+	var baleSender alerts.TelegramSender
+	if cfg.Bale.Configured() {
+		baleSender = bale.NewClient(cfg.Bale)
+	}
 	alertEngine := alerts.NewEngine(alerts.Config{
-		ArbitrageRThreshold:  cfg.Alerts.ArbitrageRThreshold,
-		BreadthHighThreshold: cfg.Alerts.BreadthHighThreshold,
-		BreadthLowThreshold:  cfg.Alerts.BreadthLowThreshold,
-		AdvanceHighThreshold: cfg.Alerts.AdvanceHighThreshold,
-		AdvanceLowThreshold:  cfg.Alerts.AdvanceLowThreshold,
-	}, tgSender, alerts.NewStore(pool))
+		ArbitrageRThreshold:   cfg.Alerts.ArbitrageRThreshold,
+		ArbitrageR12Threshold: cfg.Alerts.ArbitrageR12Threshold,
+		BreadthHighThreshold:  cfg.Alerts.BreadthHighThreshold,
+		BreadthLowThreshold:   cfg.Alerts.BreadthLowThreshold,
+		AdvanceHighThreshold:  cfg.Alerts.AdvanceHighThreshold,
+		AdvanceLowThreshold:   cfg.Alerts.AdvanceLowThreshold,
+	}, tgSender, baleSender, alerts.NewStore(pool))
 
 	scan := scanner.NewService(cfg, saClient, market.NewStore(pool), alertEngine)
 

@@ -18,7 +18,7 @@ func (f *fakeSender) SendMessage(_ context.Context, text string) error {
 
 func TestDuplicateProtectionWithoutDB(t *testing.T) {
 	sender := &fakeSender{}
-	engine := alerts.NewEngine(alerts.Config{ArbitrageRThreshold: 1}, sender, alerts.NewStore(nil))
+	engine := alerts.NewEngine(alerts.Config{ArbitrageRThreshold: 1}, sender, nil, alerts.NewStore(nil))
 	input := alerts.ArbitrageAlertInput{Expiry: "1404/09/15", Strike: 12000, ReturnPct: 5}
 	sent, err := engine.MaybeSendArbitrage(context.Background(), input)
 	if err != nil {
@@ -41,7 +41,7 @@ func TestDuplicateProtectionWithoutDB(t *testing.T) {
 
 func TestThresholdCheck(t *testing.T) {
 	sender := &fakeSender{}
-	engine := alerts.NewEngine(alerts.Config{ArbitrageRThreshold: 10}, sender, alerts.NewStore(nil))
+	engine := alerts.NewEngine(alerts.Config{ArbitrageRThreshold: 10}, sender, nil, alerts.NewStore(nil))
 	sent, err := engine.MaybeSendArbitrage(context.Background(), alerts.ArbitrageAlertInput{ReturnPct: 1})
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +53,7 @@ func TestThresholdCheck(t *testing.T) {
 
 func TestMatrixAlertDuplicateProtection(t *testing.T) {
 	sender := &fakeSender{}
-	engine := alerts.NewEngine(alerts.Config{}, sender, alerts.NewStore(nil))
+	engine := alerts.NewEngine(alerts.Config{}, sender, nil, alerts.NewStore(nil))
 	sent, err := engine.MaybeSendMatrixAlert(context.Background(), "rule1", 1200, "test alert")
 	if err != nil {
 		t.Fatal(err)

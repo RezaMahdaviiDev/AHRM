@@ -76,7 +76,7 @@ func calculate(opt sourcearena.Option, underlyingPrice float64, days int) (Cover
 	staticROI := (c / netCost) * 100
 	maxROI := ((k - netCost) / netCost) * 100
 	if k < s {
-		maxROI = staticROI
+		staticROI = maxROI
 	}
 	return CoveredCall{
 		Symbol:       opt.Name,

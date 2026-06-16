@@ -18,6 +18,7 @@ type TelegramSender interface {
 
 type Config struct {
 	ArbitrageRThreshold   float64
+	ArbitrageR12Threshold float64
 	BreadthHighThreshold  float64
 	BreadthLowThreshold   float64
 	AdvanceHighThreshold  float64
@@ -25,16 +26,18 @@ type Config struct {
 }
 
 type Engine struct {
-	cfg    Config
-	sender TelegramSender
-	store  *Store
+	cfg        Config
+	sender     TelegramSender
+	baleSender TelegramSender
+	store      *Store
 }
 
-func NewEngine(cfg Config, sender TelegramSender, store *Store) *Engine {
-	return &Engine{cfg: cfg, sender: sender, store: store}
+func NewEngine(cfg Config, sender TelegramSender, baleSender TelegramSender, store *Store) *Engine {
+	return &Engine{cfg: cfg, sender: sender, baleSender: baleSender, store: store}
 }
 
 type ArbitrageAlertInput struct {
+	Symbol    string
 	Expiry    string
 	Strike    float64
 	ReturnPct float64
@@ -45,7 +48,16 @@ func (e *Engine) MaybeSendArbitrage(ctx context.Context, input ArbitrageAlertInp
 		return false, nil
 	}
 	key := fmt.Sprintf("arb:%s:%.0f:%.2f", input.Expiry, input.Strike, input.ReturnPct)
-	return e.send(ctx, "arbitrage", key, fmt.Sprintf("Arbitrage R=%.2f%% strike=%.0f expiry=%s", input.ReturnPct, input.Strike, input.Expiry))
+	return e.sendVia(ctx, e.sender, "arbitrage", key, fmt.Sprintf("Arbitrage R=%.2f%% strike=%.0f expiry=%s", input.ReturnPct, input.Strike, input.Expiry))
+}
+
+func (e *Engine) MaybeSendArbitrageR12Bale(ctx context.Context, input ArbitrageAlertInput) (bool, error) {
+	if e.cfg.ArbitrageR12Threshold <= 0 || input.ReturnPct < e.cfg.ArbitrageR12Threshold {
+		return false, nil
+	}
+	key := fmt.Sprintf("bale-arb-r12:%s:%.0f:%.2f", input.Expiry, input.Strike, input.ReturnPct)
+	msg := fmt.Sprintf("🔔 فرصت آربیتراژ\nنماد: %s\nاسترایک: %.0f\nانقضا: %s\nR'(S×۱.۱۲۵): %.2f%%", input.Symbol, input.Strike, input.Expiry, input.ReturnPct)
+	return e.sendVia(ctx, e.baleSender, "bale_arb_r12", key, msg)
 }
 
 func (e *Engine) MaybeSendBreadth(ctx context.Context, avg float64, state string) (bool, error) {
@@ -53,7 +65,7 @@ func (e *Engine) MaybeSendBreadth(ctx context.Context, avg float64, state string
 		return false, nil
 	}
 	key := fmt.Sprintf("breadth:%s:%.4f", state, avg)
-	return e.send(ctx, "breadth", key, fmt.Sprintf("Breadth Thrust alert=%s avg10=%.4f", state, avg))
+	return e.sendVia(ctx, e.sender, "breadth", key, fmt.Sprintf("Breadth Thrust alert=%s avg10=%.4f", state, avg))
 }
 
 func (e *Engine) MaybeSendAdvanceDecline(ctx context.Context, avg float64, state string) (bool, error) {
@@ -61,17 +73,21 @@ func (e *Engine) MaybeSendAdvanceDecline(ctx context.Context, avg float64, state
 		return false, nil
 	}
 	key := fmt.Sprintf("ad:%s:%.4f", state, avg)
-	return e.send(ctx, "advance_decline", key, fmt.Sprintf("Advance/Decline alert=%s avg10=%.4f", state, avg))
+	return e.sendVia(ctx, e.sender, "advance_decline", key, fmt.Sprintf("Advance/Decline alert=%s avg10=%.4f", state, avg))
 }
 
 func (e *Engine) MaybeSendMatrixAlert(ctx context.Context, ruleID string, diff float64, message string) (bool, error) {
 	key := fmt.Sprintf("matrix:%s:%.0f", ruleID, diff)
-	return e.send(ctx, "matrix", key, message)
+	return e.sendVia(ctx, e.sender, "matrix", key, message)
 }
 
 func (e *Engine) send(ctx context.Context, alertType, key, message string) (bool, error) {
-	if e.sender == nil {
-		return false, fmt.Errorf("telegram sender not configured")
+	return e.sendVia(ctx, e.sender, alertType, key, message)
+}
+
+func (e *Engine) sendVia(ctx context.Context, sender TelegramSender, alertType, key, message string) (bool, error) {
+	if sender == nil {
+		return false, fmt.Errorf("sender not configured")
 	}
 	sent, err := e.store.WasSent(ctx, alertType, key)
 	if err != nil {
@@ -80,7 +96,7 @@ func (e *Engine) send(ctx context.Context, alertType, key, message string) (bool
 	if sent {
 		return false, nil
 	}
-	if err := e.sender.SendMessage(ctx, message); err != nil {
+	if err := sender.SendMessage(ctx, message); err != nil {
 		return false, err
 	}
 	payload, _ := json.Marshal(map[string]string{"message": message})

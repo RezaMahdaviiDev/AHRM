@@ -14,20 +14,22 @@ type Config struct {
 	HTTPAddr         string
 	LogLevel         string
 	MatrixAlertsFile string
-	RiskFreeRate            float64
-	SnapshotRefreshSeconds  int
-	Supabase                SupabaseConfig
-	SourceArena      SourceArenaConfig
-	Telegram         TelegramConfig
-	Alerts           AlertsConfig
+	RiskFreeRate           float64
+	SnapshotRefreshSeconds int
+	Supabase               SupabaseConfig
+	SourceArena            SourceArenaConfig
+	Telegram               TelegramConfig
+	Bale                   BaleConfig
+	Alerts                 AlertsConfig
 }
 
 type AlertsConfig struct {
-	ArbitrageRThreshold  float64
-	BreadthHighThreshold float64
-	BreadthLowThreshold  float64
-	AdvanceHighThreshold float64
-	AdvanceLowThreshold  float64
+	ArbitrageRThreshold   float64
+	ArbitrageR12Threshold float64
+	BreadthHighThreshold  float64
+	BreadthLowThreshold   float64
+	AdvanceHighThreshold  float64
+	AdvanceLowThreshold   float64
 }
 
 type SupabaseConfig struct {
@@ -48,6 +50,11 @@ type SourceArenaConfig struct {
 type TelegramConfig struct {
 	BotToken string
 	ChatID   string
+}
+
+type BaleConfig struct {
+	BotToken string
+	ChatIDs  string // comma-separated list of chat IDs
 }
 
 type ServiceStatus struct {
@@ -75,6 +82,10 @@ func (s SourceArenaConfig) Configured() bool {
 
 func (t TelegramConfig) Configured() bool {
 	return strings.TrimSpace(t.BotToken) != "" && strings.TrimSpace(t.ChatID) != ""
+}
+
+func (b BaleConfig) Configured() bool {
+	return strings.TrimSpace(b.BotToken) != "" && strings.TrimSpace(b.ChatIDs) != ""
 }
 
 func Load() (*Config, error) {
@@ -132,8 +143,13 @@ func LoadFromEnv() (*Config, error) {
 			BotToken: strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN")),
 			ChatID:   strings.TrimSpace(os.Getenv("TELEGRAM_CHAT_ID")),
 		},
+		Bale: BaleConfig{
+			BotToken: strings.TrimSpace(os.Getenv("BALE_BOT_TOKEN")),
+			ChatIDs:  strings.TrimSpace(os.Getenv("BALE_CHAT_IDS")),
+		},
 		Alerts: AlertsConfig{
-			ArbitrageRThreshold:  parseFloatEnv("ALERT_ARBITRAGE_R_THRESHOLD", 0),
+			ArbitrageRThreshold:   parseFloatEnv("ALERT_ARBITRAGE_R_THRESHOLD", 0),
+			ArbitrageR12Threshold: parseFloatEnv("ALERT_ARBITRAGE_R12_THRESHOLD", 10.0),
 			BreadthHighThreshold: parseFloatEnv("ALERT_BREADTH_HIGH", 0.618),
 			BreadthLowThreshold:  parseFloatEnv("ALERT_BREADTH_LOW", 0.4),
 			AdvanceHighThreshold: parseFloatEnv("ALERT_ADVANCE_HIGH", 1.4),
@@ -164,6 +180,9 @@ func (c *Config) Validate() error {
 	if err := c.validateTelegram(); err != nil {
 		return err
 	}
+	if err := c.validateBale(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -172,6 +191,15 @@ func (c *Config) validateTelegram() error {
 	hasChat := strings.TrimSpace(c.Telegram.ChatID) != ""
 	if hasChat && !hasToken {
 		return fmt.Errorf("telegram: TELEGRAM_BOT_TOKEN is required when TELEGRAM_CHAT_ID is set")
+	}
+	return nil
+}
+
+func (c *Config) validateBale() error {
+	hasToken := strings.TrimSpace(c.Bale.BotToken) != ""
+	hasChat := strings.TrimSpace(c.Bale.ChatIDs) != ""
+	if hasChat && !hasToken {
+		return fmt.Errorf("bale: BALE_BOT_TOKEN is required when BALE_CHAT_IDS is set")
 	}
 	return nil
 }
