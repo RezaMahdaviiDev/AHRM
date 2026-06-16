@@ -11,6 +11,8 @@ import (
 func TestCalculateAllFormulas(t *testing.T) {
 	engine := coveredcall.NewEngine()
 	engine.Now = func() time.Time { return time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC) }
+
+	// K < S: MaxROI must be capped at StaticROI
 	opts := []sourcearena.Option{
 		{Name: "ضهرم1200", ClosePrice: 1500, StrikePrice: 12000, ExpiryDate: "1405/12/15"},
 	}
@@ -29,7 +31,34 @@ func TestCalculateAllFormulas(t *testing.T) {
 	if diff := cc.StaticROIPct - wantStatic; diff > 0.0001 || diff < -0.0001 {
 		t.Fatalf("static_roi=%v want=%v", cc.StaticROIPct, wantStatic)
 	}
-	wantMax := ((12000.0 - 23500.0) / 23500.0) * 100
+	// K(12000) < S(25000): max ROI must equal static ROI
+	if diff := cc.MaxROIPct - wantStatic; diff > 0.0001 || diff < -0.0001 {
+		t.Fatalf("max_roi=%v want=%v (static, because K<S)", cc.MaxROIPct, wantStatic)
+	}
+	wantBreakEven := 12000.0 * (1 - wantStatic/100)
+	if diff := cc.BreakEven - wantBreakEven; diff > 0.01 || diff < -0.01 {
+		t.Fatalf("break_even=%v want=%v", cc.BreakEven, wantBreakEven)
+	}
+}
+
+func TestCalculateAllMaxROIWhenKGeS(t *testing.T) {
+	engine := coveredcall.NewEngine()
+	engine.Now = func() time.Time { return time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC) }
+
+	// K >= S: MaxROI uses the normal formula ((K - NetCost) / NetCost) * 100
+	// S=20000, C=1500, K=26000, NetCost=18500
+	opts := []sourcearena.Option{
+		{Name: "ضهرم2600", ClosePrice: 1500, StrikePrice: 26000, ExpiryDate: "1405/12/15"},
+	}
+	got, err := engine.CalculateAll(opts, 20000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("len=%d want 1", len(got))
+	}
+	cc := got[0]
+	wantMax := ((26000.0 - 18500.0) / 18500.0) * 100
 	if diff := cc.MaxROIPct - wantMax; diff > 0.0001 || diff < -0.0001 {
 		t.Fatalf("max_roi=%v want=%v", cc.MaxROIPct, wantMax)
 	}

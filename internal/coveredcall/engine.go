@@ -20,6 +20,7 @@ type CoveredCall struct {
 	NetCost      float64 `json:"net_cost"`
 	StaticROIPct float64 `json:"static_roi_pct"`
 	MaxROIPct    float64 `json:"max_roi_pct"`
+	BreakEven    float64 `json:"break_even"`
 }
 
 type Engine struct {
@@ -72,6 +73,11 @@ func calculate(opt sourcearena.Option, underlyingPrice float64, days int) (Cover
 	if netCost <= 0 {
 		return CoveredCall{}, false
 	}
+	staticROI := (c / netCost) * 100
+	maxROI := ((k - netCost) / netCost) * 100
+	if k < s {
+		maxROI = staticROI
+	}
 	return CoveredCall{
 		Symbol:       opt.Name,
 		Expiry:       opt.ExpiryDate,
@@ -80,7 +86,8 @@ func calculate(opt sourcearena.Option, underlyingPrice float64, days int) (Cover
 		OptionPrice:  c,
 		Strike:       k,
 		NetCost:      netCost,
-		StaticROIPct: (c / netCost) * 100,
-		MaxROIPct:    ((k - netCost) / netCost) * 100,
+		StaticROIPct: staticROI,
+		MaxROIPct:    maxROI,
+		BreakEven:    k * (1 - staticROI/100),
 	}, true
 }

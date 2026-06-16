@@ -52,6 +52,7 @@
           <th class="sortable" data-col="6" data-type="number">هزینه خالص (Net Cost) <span class="sort-icon"></span></th>
           <th class="sortable" data-col="7" data-type="number">Static ROI % <span class="sort-icon"></span></th>
           <th class="sortable" data-col="8" data-type="number">Max ROI % <span class="sort-icon"></span></th>
+          <th class="sortable" data-col="9" data-type="number">نقطه سر به سر <span class="sort-icon"></span></th>
         </tr>
       </thead>
       <tbody id="cc-body">
@@ -66,9 +67,10 @@
         <td data-value="{{printf "%.0f" .NetCost}}">{{printf "%.0f" .NetCost}}</td>
         <td data-value="{{printf "%.4f" .StaticROIPct}}">{{printf "%.2f" .StaticROIPct}}</td>
         <td class="{{if lt .MaxROIPct 0.0}}negative{{else}}positive{{end}}" data-value="{{printf "%.4f" .MaxROIPct}}">{{printf "%.2f" .MaxROIPct}}</td>
+        <td data-value="{{printf "%.4f" .BreakEven}}">{{printf "%.0f" .BreakEven}}</td>
       </tr>
       {{else}}
-      <tr class="empty-row"><td colspan="9">بدون کاورد کال — call با سررسید بیش از ۳۰ روز یافت نشد.</td></tr>
+      <tr class="empty-row"><td colspan="10">بدون کاورد کال — call با سررسید بیش از ۳۰ روز یافت نشد.</td></tr>
       {{end}}
       </tbody>
     </table>
