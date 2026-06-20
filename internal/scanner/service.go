@@ -3,6 +3,7 @@ package scanner
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"ahrm/internal/alerts"
@@ -27,6 +28,7 @@ type Service struct {
 	cfg        *config.Config
 	client     *sourcearena.Client
 	marketStore market.DailyStore
+	backfilling atomic.Bool
 	pairEngine        *pairs.Engine
 	arbEngine         *arbitrage.Engine
 	coveredCallEngine *coveredcall.Engine
@@ -65,6 +67,7 @@ type Snapshot struct {
 	BullSpreadsOTM    []bullspread.Spread            `json:"bull_spreads_otm"`
 	PriceChart        []sourcearena.Candle           `json:"price_chart"`
 	Indicators        *sourcearena.TechnicalIndicators `json:"indicators,omitempty"`
+	BackfillInProgress bool                          `json:"backfill_in_progress,omitempty"`
 	Errors            []string                       `json:"errors,omitempty"`
 }
 
@@ -95,7 +98,7 @@ func NewService(cfg *config.Config, client *sourcearena.Client, marketStore mark
 }
 
 func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
-	snap := Snapshot{GeneratedAt: time.Now().UTC()}
+	snap := Snapshot{GeneratedAt: time.Now().UTC(), BackfillInProgress: s.backfilling.Load()}
 	if s.client == nil {
 		snap.Errors = append(snap.Errors, "sourcearena client not configured")
 		return snap, nil
@@ -141,44 +144,46 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		}
 	}
 
-	from := time.Now().AddDate(0, 0, -hvCandleLookbackDays)
-	to := time.Now()
-	hvReq := sourcearena.CandleRequest{
-		Symbol:     domain.UnderlyingSymbol,
-		From:       from,
-		To:         to,
-		Resolution: sourcearena.Resolution1D,
-		Type:       sourcearena.AdjustCapAndDividend,
-	}
-	snap.HVFetch = HVFetch{
-		Symbol:     hvReq.Symbol,
-		From:       hvReq.From,
-		To:         hvReq.To,
-		Resolution: hvReq.Resolution,
-		Type:       hvReq.Type,
-		TypeLabel:  "افزایش سرمایه و سود نقدی",
-	}
-	candles, err := s.client.FetchCandles(ctx, hvReq)
-	if err != nil {
-		snap.Errors = append(snap.Errors, fmt.Sprintf("candles: %v", err))
-	} else {
-		if hvResult, hvErr := s.hvEngine.Calculate(candles); hvErr == nil {
-			snap.HV = hvResult
+	if !snap.BackfillInProgress {
+		from := time.Now().AddDate(0, 0, -hvCandleLookbackDays)
+		to := time.Now()
+		hvReq := sourcearena.CandleRequest{
+			Symbol:     domain.UnderlyingSymbol,
+			From:       from,
+			To:         to,
+			Resolution: sourcearena.Resolution1D,
+			Type:       sourcearena.AdjustCapAndDividend,
+		}
+		snap.HVFetch = HVFetch{
+			Symbol:     hvReq.Symbol,
+			From:       hvReq.From,
+			To:         hvReq.To,
+			Resolution: hvReq.Resolution,
+			Type:       hvReq.Type,
+			TypeLabel:  "افزایش سرمایه و سود نقدی",
+		}
+		candles, err := s.client.FetchCandles(ctx, hvReq)
+		if err != nil {
+			snap.Errors = append(snap.Errors, fmt.Sprintf("candles: %v", err))
 		} else {
-			snap.Errors = append(snap.Errors, fmt.Sprintf("hv: %v", hvErr))
-		}
-		if len(candles) > 0 {
-			start := len(candles) - 30
-			if start < 0 {
-				start = 0
+			if hvResult, hvErr := s.hvEngine.Calculate(candles); hvErr == nil {
+				snap.HV = hvResult
+			} else {
+				snap.Errors = append(snap.Errors, fmt.Sprintf("hv: %v", hvErr))
 			}
-			snap.PriceChart = candles[start:]
+			if len(candles) > 0 {
+				start := len(candles) - 30
+				if start < 0 {
+					start = 0
+				}
+				snap.PriceChart = candles[start:]
+			}
 		}
-	}
-	if indResult, indErr := s.client.FetchIndicators(ctx, domain.UnderlyingSymbol); indErr == nil {
-		snap.Indicators = indResult
-	} else {
-		snap.Errors = append(snap.Errors, fmt.Sprintf("indicators: %v", indErr))
+		if indResult, indErr := s.client.FetchIndicators(ctx, domain.UnderlyingSymbol); indErr == nil {
+			snap.Indicators = indResult
+		} else {
+			snap.Errors = append(snap.Errors, fmt.Sprintf("indicators: %v", indErr))
+		}
 	}
 
 	if len(options) > 0 {
@@ -268,9 +273,12 @@ func (s *Service) StartBackfillScheduler(ctx context.Context) {
 }
 
 func (s *Service) runBackfill(ctx context.Context) {
-	if s.client == nil {
+	if s.client == nil || s.marketStore == nil {
 		return
 	}
+	s.backfilling.Store(true)
+	defer s.backfilling.Store(false)
+
 	bfCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 	symbols, err := s.client.FetchAllSymbols(bfCtx)

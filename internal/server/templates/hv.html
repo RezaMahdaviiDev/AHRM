@@ -40,6 +40,11 @@
   </header>
   <div class="update-bar">آخرین به‌روزرسانی: {{.LastUpdatedTehran}} (ایران) · رفرش خودکار هر {{.RefreshMinutes}} دقیقه</div>
   <main>
+    {{if .Snapshot.BackfillInProgress}}
+    <div class="card" style="border-left: 4px solid #fbbf24; margin-bottom: 1rem;">
+      <p style="color:#fbbf24; margin:0">در حال دریافت داده‌های تاریخی بازار — HV پس از تکمیل (حدود ۵ دقیقه) نمایش داده می‌شود.</p>
+    </div>
+    {{end}}
     <h1>Historical Volatility — {{.Snapshot.HVFetch.Symbol}}</h1>
 
     <div class="grid">

@@ -33,6 +33,12 @@
   <main>
     <h1>شاخص‌های بازار</h1>
 
+    {{if .Snapshot.BackfillInProgress}}
+    <div class="card" style="border-left: 4px solid #fbbf24;">
+      <p style="color:#fbbf24; margin:0">در حال دریافت داده‌های تاریخی بازار... میانگین‌ها پس از تکمیل (حدود ۵ دقیقه) به‌روز می‌شوند.</p>
+    </div>
+    {{end}}
+
     <div class="card">
       <h3>Breadth Thrust <span class="muted" style="font-size:0.8rem">(نسبت نمادهای مثبت به کل بازار)</span></h3>
       <p>امروز: {{printf "%.4f" .Snapshot.Breadth.CurrentValue}}</p>
