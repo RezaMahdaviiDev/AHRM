@@ -62,6 +62,44 @@ func (s *FileStore) UpsertToday(_ context.Context, day indicators.DailyMarket) e
 	return s.save(records)
 }
 
+func (s *FileStore) UpsertDay(_ context.Context, date time.Time, day indicators.DailyMarket) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	records := s.load()
+	dateStr := date.UTC().Format("2006-01-02")
+
+	found := false
+	for i, r := range records {
+		if r.Date == dateStr {
+			records[i].Positive = day.Positive
+			records[i].Negative = day.Negative
+			records[i].Total = day.Total
+			found = true
+			break
+		}
+	}
+	if !found {
+		records = append(records, fileRecord{
+			Date:     dateStr,
+			Positive: day.Positive,
+			Negative: day.Negative,
+			Total:    day.Total,
+		})
+	}
+
+	// sort by date ascending
+	for i := 1; i < len(records); i++ {
+		for j := i; j > 0 && records[j].Date < records[j-1].Date; j-- {
+			records[j], records[j-1] = records[j-1], records[j]
+		}
+	}
+	if len(records) > maxHistoryDays {
+		records = records[len(records)-maxHistoryDays:]
+	}
+	return s.save(records)
+}
+
 func (s *FileStore) LastDays(_ context.Context, days int) ([]indicators.DailyMarket, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

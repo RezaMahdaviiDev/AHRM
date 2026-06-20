@@ -11,6 +11,7 @@ import (
 
 type DailyStore interface {
 	UpsertToday(ctx context.Context, day indicators.DailyMarket) error
+	UpsertDay(ctx context.Context, date time.Time, day indicators.DailyMarket) error
 	LastDays(ctx context.Context, days int) ([]indicators.DailyMarket, error)
 }
 
@@ -30,6 +31,20 @@ func (s *Store) UpsertToday(ctx context.Context, day indicators.DailyMarket) err
 		VALUES ($1,$2,$3,$4)
 		ON CONFLICT (day) DO UPDATE SET positive=EXCLUDED.positive, negative=EXCLUDED.negative, total=EXCLUDED.total`,
 		today, day.Positive, day.Negative, day.Total,
+	)
+	return err
+}
+
+func (s *Store) UpsertDay(ctx context.Context, date time.Time, day indicators.DailyMarket) error {
+	if s == nil || s.pool == nil {
+		return nil
+	}
+	d := date.UTC().Truncate(24 * time.Hour)
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO market_daily_stats (day, positive, negative, total)
+		VALUES ($1,$2,$3,$4)
+		ON CONFLICT (day) DO UPDATE SET positive=EXCLUDED.positive, negative=EXCLUDED.negative, total=EXCLUDED.total`,
+		d, day.Positive, day.Negative, day.Total,
 	)
 	return err
 }

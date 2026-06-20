@@ -116,9 +116,29 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		snap.Underlying = underlying
 	}
 
-	if len(symbols) > 0 {
+	if s.marketStore != nil && len(symbols) > 0 {
 		today := market.ClassifyDay(symbols)
 		_ = s.marketStore.UpsertToday(ctx, today)
+	}
+	var history []indicators.DailyMarket
+	if s.marketStore != nil {
+		var histErr error
+		history, histErr = s.marketStore.LastDays(ctx, 10)
+		if histErr != nil {
+			snap.Errors = append(snap.Errors, fmt.Sprintf("market history: %v", histErr))
+		}
+	}
+	if len(history) > 0 {
+		if breadth, bErr := s.breadth.Evaluate(history); bErr == nil {
+			snap.Breadth = breadth
+		} else {
+			snap.Errors = append(snap.Errors, fmt.Sprintf("breadth: %v", bErr))
+		}
+		if ad, aErr := s.advance.Evaluate(history); aErr == nil {
+			snap.AdvanceDecline = ad
+		} else {
+			snap.Errors = append(snap.Errors, fmt.Sprintf("advance_decline: %v", aErr))
+		}
 	}
 
 	from := time.Now().AddDate(0, 0, -hvCandleLookbackDays)
@@ -153,25 +173,6 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 				start = 0
 			}
 			snap.PriceChart = candles[start:]
-		}
-		// Use candle history for past 9 days + today from market API (real-time) → consistent 10-day window
-		pastHistory := candleMarketHistory(candles, 9)
-		if len(pastHistory) > 0 && snap.Underlying.ClosePrice > 0 {
-			todayDay := indicators.DailyMarket{Positive: 0, Negative: 1, Total: 1}
-			if snap.Underlying.ClosePriceChangePct > 0 {
-				todayDay = indicators.DailyMarket{Positive: 1, Negative: 0, Total: 1}
-			}
-			history := append(pastHistory, todayDay)
-			if breadth, bErr := s.breadth.Evaluate(history); bErr == nil {
-				snap.Breadth = breadth
-			} else {
-				snap.Errors = append(snap.Errors, fmt.Sprintf("breadth: %v", bErr))
-			}
-			if ad, aErr := s.advance.Evaluate(history); aErr == nil {
-				snap.AdvanceDecline = ad
-			} else {
-				snap.Errors = append(snap.Errors, fmt.Sprintf("advance_decline: %v", aErr))
-			}
 		}
 	}
 	if indResult, indErr := s.client.FetchIndicators(ctx, domain.UnderlyingSymbol); indErr == nil {
@@ -249,26 +250,45 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 	return snap, nil
 }
 
-// candleMarketHistory derives DailyMarket records from consecutive candle close prices.
-// Returns up to `days` records: Positive=1 if close rose vs previous candle, else Negative=1.
-// Does NOT include today — caller appends today's value from the live market API.
-func candleMarketHistory(candles []sourcearena.Candle, days int) []indicators.DailyMarket {
-	if len(candles) < 2 {
-		return nil
-	}
-	needed := days + 1
-	start := len(candles) - needed
-	if start < 0 {
-		start = 0
-	}
-	sub := candles[start:]
-	out := make([]indicators.DailyMarket, 0, len(sub)-1)
-	for i := 1; i < len(sub); i++ {
-		if sub[i].Close > sub[i-1].Close {
-			out = append(out, indicators.DailyMarket{Positive: 1, Negative: 0, Total: 1})
-		} else {
-			out = append(out, indicators.DailyMarket{Positive: 0, Negative: 1, Total: 1})
+// StartBackfillScheduler runs market history backfill on startup and then once per day
+// at 20:00 Tehran time. Runs in a background goroutine; returns immediately.
+func (s *Service) StartBackfillScheduler(ctx context.Context) {
+	go func() {
+		s.runBackfill(ctx)
+		for {
+			next := nextTehranTime(20, 0)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Until(next)):
+				s.runBackfill(ctx)
+			}
 		}
+	}()
+}
+
+func (s *Service) runBackfill(ctx context.Context) {
+	if s.client == nil {
+		return
 	}
-	return out
+	bfCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	symbols, err := s.client.FetchAllSymbols(bfCtx)
+	if err != nil || len(symbols) == 0 {
+		return
+	}
+	_ = market.BackfillHistory(bfCtx, s.client, symbols, s.marketStore)
+}
+
+func nextTehranTime(hour, minute int) time.Time {
+	loc, err := time.LoadLocation("Asia/Tehran")
+	if err != nil {
+		loc = time.FixedZone("IRST", 3*3600+30*60)
+	}
+	now := time.Now().In(loc)
+	next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, loc)
+	if !next.After(now) {
+		next = next.Add(24 * time.Hour)
+	}
+	return next
 }

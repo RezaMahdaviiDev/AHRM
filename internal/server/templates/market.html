@@ -34,19 +34,19 @@
     <h1>شاخص‌های بازار</h1>
 
     <div class="card">
-      <h3>Breadth Thrust <span class="muted" style="font-size:0.8rem">(جهت روزانه اهرم)</span></h3>
+      <h3>Breadth Thrust <span class="muted" style="font-size:0.8rem">(نسبت نمادهای مثبت به کل بازار)</span></h3>
       <p>امروز: {{printf "%.4f" .Snapshot.Breadth.CurrentValue}}</p>
       <p>میانگین {{.Snapshot.Breadth.DaysInWindow}} روز: {{printf "%.4f" .Snapshot.Breadth.Average10Day}}</p>
       <p>وضعیت: <span class="alert-{{.Snapshot.Breadth.AlertState}}">{{if .Snapshot.Breadth.AlertState}}{{.Snapshot.Breadth.AlertState}}{{else}}—{{end}}</span></p>
-      <p class="muted">آستانه بالا: 0.618 | آستانه پایین: 0.4 | ۱=روز مثبت، ۰=روز منفی</p>
+      <p class="muted">آستانه بالا: 0.618 | آستانه پایین: 0.4 | مثبت: تغییر &gt; ۰.۵٪ | منفی: تغییر &lt; ۰.۵-٪</p>
     </div>
 
     <div class="card">
-      <h3>Advance / Decline <span class="muted" style="font-size:0.8rem">(جهت روزانه اهرم)</span></h3>
+      <h3>Advance / Decline <span class="muted" style="font-size:0.8rem">(نسبت نمادهای مثبت به منفی)</span></h3>
       <p>امروز: {{printf "%.4f" .Snapshot.AdvanceDecline.CurrentValue}}</p>
       <p>میانگین {{.Snapshot.AdvanceDecline.DaysInWindow}} روز: {{printf "%.4f" .Snapshot.AdvanceDecline.Average10Day}}</p>
       <p>وضعیت: <span class="alert-{{.Snapshot.AdvanceDecline.AlertState}}">{{if .Snapshot.AdvanceDecline.AlertState}}{{.Snapshot.AdvanceDecline.AlertState}}{{else}}—{{end}}</span></p>
-      <p class="muted">آستانه بالا: 1.4 | آستانه پایین: 0.6</p>
+      <p class="muted">آستانه بالا: 1.4 | آستانه پایین: 0.6 | AD = مثبت / منفی</p>
     </div>
 
     {{if .Snapshot.Errors}}

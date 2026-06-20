@@ -58,7 +58,9 @@ func (e *Engine) CalculateAll(options []sourcearena.Option, underlyingPrice, ris
 		T := float64(days) / 365.0
 		sigma, err := blackscholes.ImpliedVolatility(opt.ClosePrice, underlyingPrice, opt.StrikePrice, T, riskFreeRate)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("iv %s: %v", opt.Name, err))
+			if err != blackscholes.ErrPriceOutOfBounds {
+				errs = append(errs, fmt.Sprintf("iv %s: %v", opt.Name, err))
+			}
 			continue
 		}
 		out = append(out, IVResult{

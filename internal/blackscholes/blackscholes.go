@@ -46,7 +46,9 @@ func ImpliedVolatility(marketPrice, S, K, T, r float64) (float64, error) {
 		return 0, ErrInvalidInputs
 	}
 	lower, upper := theoreticalBounds(S, K, T, r)
-	if marketPrice <= lower || marketPrice >= upper {
+	// Allow a small tolerance for stale prices on illiquid deep-ITM options.
+	const boundsTolerance = 0.5
+	if marketPrice < lower-boundsTolerance || marketPrice >= upper {
 		return 0, ErrPriceOutOfBounds
 	}
 

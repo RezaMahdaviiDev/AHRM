@@ -6,18 +6,22 @@ import (
 )
 
 func ClassifyDay(symbols []sourcearena.SymbolQuote) indicators.DailyMarket {
-	var positive, negative int
-	for _, symbol := range symbols {
+	var positive, negative, total int
+	for _, sym := range symbols {
+		if sym.TradeValue <= 0 {
+			continue
+		}
+		total++
 		switch {
-		case symbol.ClosePriceChangePct > 0:
+		case sym.ClosePriceChangePct > 0.5:
 			positive++
-		case symbol.ClosePriceChangePct < 0:
+		case sym.ClosePriceChangePct < -0.5:
 			negative++
 		}
 	}
 	return indicators.DailyMarket{
 		Positive: positive,
 		Negative: negative,
-		Total:    len(symbols),
+		Total:    total,
 	}
 }

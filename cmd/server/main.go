@@ -96,6 +96,7 @@ func main() {
 	refreshCtx, stopRefresh := context.WithCancel(context.Background())
 	defer stopRefresh()
 	srv.StartBackgroundRefresh(refreshCtx)
+	scan.StartBackfillScheduler(refreshCtx)
 
 	logReadiness(logger, srv.ReadinessReport())
 
