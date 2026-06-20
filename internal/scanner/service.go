@@ -286,6 +286,11 @@ func (s *Service) runBackfill(ctx context.Context) {
 	if s.client == nil || s.marketStore == nil {
 		return
 	}
+	// Skip the per-symbol candle backfill when SQL already covers the recent
+	// indicator window; on a store error NeedsBackfill returns true (fail-safe).
+	if need, _ := market.NeedsBackfill(ctx, s.marketStore); !need {
+		return
+	}
 	s.backfilling.Store(true)
 	defer s.backfilling.Store(false)
 
