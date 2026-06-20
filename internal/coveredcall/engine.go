@@ -21,6 +21,7 @@ type CoveredCall struct {
 	StaticROIPct float64 `json:"static_roi_pct"`
 	MaxROIPct    float64 `json:"max_roi_pct"`
 	BreakEven    float64 `json:"break_even"`
+	TradeVolume  float64 `json:"trade_volume"`
 }
 
 type Engine struct {
@@ -89,5 +90,6 @@ func calculate(opt sourcearena.Option, underlyingPrice float64, days int) (Cover
 		StaticROIPct: staticROI,
 		MaxROIPct:    maxROI,
 		BreakEven:    s - c,
+		TradeVolume:  opt.TradeVolume,
 	}, true
 }

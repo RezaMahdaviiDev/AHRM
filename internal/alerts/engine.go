@@ -17,12 +17,13 @@ type TelegramSender interface {
 }
 
 type Config struct {
-	ArbitrageRThreshold   float64
-	ArbitrageR12Threshold float64
-	BreadthHighThreshold  float64
-	BreadthLowThreshold   float64
-	AdvanceHighThreshold  float64
-	AdvanceLowThreshold   float64
+	ArbitrageRThreshold     float64
+	ArbitrageR12Threshold   float64
+	BreadthHighThreshold    float64
+	BreadthLowThreshold     float64
+	AdvanceHighThreshold    float64
+	AdvanceLowThreshold     float64
+	CoveredCallROIThreshold float64
 }
 
 type Engine struct {
@@ -58,6 +59,23 @@ func (e *Engine) MaybeSendArbitrageR12Bale(ctx context.Context, input ArbitrageA
 	key := fmt.Sprintf("bale-arb-r12:%s:%.0f:%.2f", input.Expiry, input.Strike, input.ReturnPct)
 	msg := fmt.Sprintf("🔔 فرصت آربیتراژ\nنماد: %s\nاسترایک: %.0f\nانقضا: %s\nR'(S×۱.۱۲۵): %.2f%%", input.Symbol, input.Strike, input.Expiry, input.ReturnPct)
 	return e.sendVia(ctx, e.baleSender, "bale_arb_r12", key, msg)
+}
+
+type CoveredCallAlertInput struct {
+	Symbol       string
+	Expiry       string
+	Strike       float64
+	StaticROIPct float64
+}
+
+func (e *Engine) MaybeSendCoveredCallROIBale(ctx context.Context, input CoveredCallAlertInput) (bool, error) {
+	if e.cfg.CoveredCallROIThreshold <= 0 || input.StaticROIPct < e.cfg.CoveredCallROIThreshold {
+		return false, nil
+	}
+	key := fmt.Sprintf("bale-cc-roi:%s:%.0f:%.2f", input.Expiry, input.Strike, input.StaticROIPct)
+	msg := fmt.Sprintf("📈 کاورد کال پربازده\nنماد: %s\nاسترایک: %.0f\nانقضا: %s\nStatic ROI: %.2f%%",
+		input.Symbol, input.Strike, input.Expiry, input.StaticROIPct)
+	return e.sendVia(ctx, e.baleSender, "bale_cc_roi", key, msg)
 }
 
 func (e *Engine) MaybeSendBreadth(ctx context.Context, avg float64, state string) (bool, error) {

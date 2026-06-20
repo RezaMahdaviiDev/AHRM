@@ -193,6 +193,16 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 				snap.Errors = append(snap.Errors, fmt.Sprintf("covered_call: %v", ccErr))
 			} else {
 				snap.CoveredCalls = covered
+				for _, cc := range covered {
+					if s.alerts != nil {
+						_, _ = s.alerts.MaybeSendCoveredCallROIBale(ctx, alerts.CoveredCallAlertInput{
+							Symbol:       cc.Symbol,
+							Expiry:       cc.Expiry,
+							Strike:       cc.Strike,
+							StaticROIPct: cc.StaticROIPct,
+						})
+					}
+				}
 			}
 			ivResults, ivErrs := s.ivEngine.CalculateAll(options, snap.Underlying.ClosePrice, s.cfg.RiskFreeRate)
 			snap.ImpliedVolatility = ivResults

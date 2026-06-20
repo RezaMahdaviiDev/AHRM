@@ -24,12 +24,13 @@ type Config struct {
 }
 
 type AlertsConfig struct {
-	ArbitrageRThreshold   float64
-	ArbitrageR12Threshold float64
-	BreadthHighThreshold  float64
-	BreadthLowThreshold   float64
-	AdvanceHighThreshold  float64
-	AdvanceLowThreshold   float64
+	ArbitrageRThreshold     float64
+	ArbitrageR12Threshold   float64
+	BreadthHighThreshold    float64
+	BreadthLowThreshold     float64
+	AdvanceHighThreshold    float64
+	AdvanceLowThreshold     float64
+	CoveredCallROIThreshold float64
 }
 
 type SupabaseConfig struct {
@@ -148,12 +149,13 @@ func LoadFromEnv() (*Config, error) {
 			ChatIDs:  strings.TrimSpace(os.Getenv("BALE_CHAT_IDS")),
 		},
 		Alerts: AlertsConfig{
-			ArbitrageRThreshold:   parseFloatEnv("ALERT_ARBITRAGE_R_THRESHOLD", 0),
-			ArbitrageR12Threshold: parseFloatEnv("ALERT_ARBITRAGE_R12_THRESHOLD", 10.0),
-			BreadthHighThreshold: parseFloatEnv("ALERT_BREADTH_HIGH", 0.618),
-			BreadthLowThreshold:  parseFloatEnv("ALERT_BREADTH_LOW", 0.4),
-			AdvanceHighThreshold: parseFloatEnv("ALERT_ADVANCE_HIGH", 1.4),
-			AdvanceLowThreshold:  parseFloatEnv("ALERT_ADVANCE_LOW", 0.6),
+			ArbitrageRThreshold:     parseFloatEnv("ALERT_ARBITRAGE_R_THRESHOLD", 0),
+			ArbitrageR12Threshold:   parseFloatEnv("ALERT_ARBITRAGE_R12_THRESHOLD", 10.0),
+			BreadthHighThreshold:    parseFloatEnv("ALERT_BREADTH_HIGH", 0.618),
+			BreadthLowThreshold:     parseFloatEnv("ALERT_BREADTH_LOW", 0.4),
+			AdvanceHighThreshold:    parseFloatEnv("ALERT_ADVANCE_HIGH", 1.4),
+			AdvanceLowThreshold:     parseFloatEnv("ALERT_ADVANCE_LOW", 0.6),
+			CoveredCallROIThreshold: parseFloatEnv("ALERT_COVERED_CALL_ROI_THRESHOLD", 30.0),
 		},
 	}
 	return cfg, cfg.Validate()

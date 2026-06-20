@@ -74,12 +74,13 @@ func main() {
 		baleSender = bale.NewClient(cfg.Bale)
 	}
 	alertEngine := alerts.NewEngine(alerts.Config{
-		ArbitrageRThreshold:   cfg.Alerts.ArbitrageRThreshold,
-		ArbitrageR12Threshold: cfg.Alerts.ArbitrageR12Threshold,
-		BreadthHighThreshold:  cfg.Alerts.BreadthHighThreshold,
-		BreadthLowThreshold:   cfg.Alerts.BreadthLowThreshold,
-		AdvanceHighThreshold:  cfg.Alerts.AdvanceHighThreshold,
-		AdvanceLowThreshold:   cfg.Alerts.AdvanceLowThreshold,
+		ArbitrageRThreshold:     cfg.Alerts.ArbitrageRThreshold,
+		ArbitrageR12Threshold:   cfg.Alerts.ArbitrageR12Threshold,
+		BreadthHighThreshold:    cfg.Alerts.BreadthHighThreshold,
+		BreadthLowThreshold:     cfg.Alerts.BreadthLowThreshold,
+		AdvanceHighThreshold:    cfg.Alerts.AdvanceHighThreshold,
+		AdvanceLowThreshold:     cfg.Alerts.AdvanceLowThreshold,
+		CoveredCallROIThreshold: cfg.Alerts.CoveredCallROIThreshold,
 	}, tgSender, baleSender, alerts.NewStore(pool))
 
 	var mStore market.DailyStore
