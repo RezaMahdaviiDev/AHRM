@@ -27,7 +27,9 @@ type optionWire struct {
 	BasisName           string    `json:"basis_name"`
 	BasisPricePercent   flexFloat `json:"basis_price_percent"`
 	OpenPosition        flexFloat `json:"op"`
+	SellRow1Price       flexFloat `json:"1_sell_price"`
 	SellRow1Volume      flexFloat `json:"1_sell_volume"`
+	BuyRow1Price        flexFloat `json:"1_buy_price"`
 	BuyRow1Volume       flexFloat `json:"1_buy_volume"`
 	TradeValue          flexFloat `json:"trade_value"`
 	TradeVolume         flexFloat `json:"trade_volume"`
@@ -52,7 +54,9 @@ type Option struct {
 	BasisName              string  `json:"basis_name"`
 	BasisPricePercent      float64 `json:"basis_price_percent"`
 	OpenPosition           float64 `json:"op"`
+	SellRow1Price          float64 `json:"1_sell_price"`
 	SellRow1Volume         float64 `json:"1_sell_volume"`
+	BuyRow1Price           float64 `json:"1_buy_price"`
 	BuyRow1Volume          float64 `json:"1_buy_volume"`
 	TradeValue             float64 `json:"trade_value"`
 	TradeVolume            float64 `json:"trade_volume"`
@@ -173,7 +177,9 @@ func wiresToOptions(wires []optionWire) []Option {
 			BasisName:           w.BasisName,
 			BasisPricePercent:   float64(w.BasisPricePercent),
 			OpenPosition:        float64(w.OpenPosition),
+			SellRow1Price:       float64(w.SellRow1Price),
 			SellRow1Volume:      float64(w.SellRow1Volume),
+			BuyRow1Price:        float64(w.BuyRow1Price),
 			BuyRow1Volume:       float64(w.BuyRow1Volume),
 			TradeValue:          float64(w.TradeValue),
 			TradeVolume:         float64(w.TradeVolume),
@@ -233,4 +239,66 @@ func parseFlexibleFloat(raw json.RawMessage) (float64, error) {
 	}
 	s = strings.TrimSpace(strings.TrimSuffix(s, "%"))
 	return strconv.ParseFloat(s, 64)
+}
+
+// TechnicalIndicators is the response from the all_indicators endpoint.
+// Field names are based on SourceArena API docs; may need adjustment after live testing.
+type IndicatorItem struct {
+	Value  float64 `json:"value"`
+	Signal string  `json:"signal"` // "buy", "neutral", "sell"
+}
+
+type MACDItem struct {
+	Value      float64 `json:"value"`
+	SignalLine float64 `json:"signal_line"`
+	Histogram  float64 `json:"histogram"`
+	Signal     string  `json:"signal"`
+}
+
+type BollingerItem struct {
+	Upper  float64 `json:"upper"`
+	Middle float64 `json:"middle"`
+	Lower  float64 `json:"lower"`
+	Signal string  `json:"signal"`
+}
+
+type TechnicalSum struct {
+	Buy     int `json:"buy"`
+	Neutral int `json:"neutral"`
+	Sell    int `json:"sell"`
+}
+
+type TechnicalIndicators struct {
+	TechnicalSum TechnicalSum  `json:"technical_sum"`
+	RSI          IndicatorItem `json:"rsi"`
+	MFI          IndicatorItem `json:"mfi"`
+	CCI          IndicatorItem `json:"cci"`
+	MACD         MACDItem      `json:"macd"`
+	EMA9         IndicatorItem `json:"ema9"`
+	EMA26        IndicatorItem `json:"ema26"`
+	EMA50        IndicatorItem `json:"ema50"`
+	SMA          IndicatorItem `json:"sma"`
+	Bollinger    BollingerItem `json:"bollinger"`
+}
+
+func decodeTechnicalIndicators(raw json.RawMessage) (*TechnicalIndicators, error) {
+	var ind TechnicalIndicators
+	if err := json.Unmarshal(raw, &ind); err == nil {
+		return &ind, nil
+	}
+	var wrapped map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &wrapped); err != nil {
+		return nil, fmt.Errorf("decode indicators: %w", err)
+	}
+	for _, key := range []string{"data", "results", "items"} {
+		if payload, ok := wrapped[key]; ok {
+			if err := json.Unmarshal(payload, &ind); err == nil {
+				return &ind, nil
+			}
+		}
+	}
+	if msg, ok := wrapped["Error"]; ok {
+		return nil, NewAPIError("indicators", 0, strings.Trim(string(msg), `"`))
+	}
+	return nil, fmt.Errorf("decode indicators: unexpected payload")
 }

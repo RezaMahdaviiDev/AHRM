@@ -16,9 +16,10 @@ type DailyValue struct {
 }
 
 type IndicatorResult struct {
-	CurrentValue float64     `json:"current_value"`
-	Average10Day float64     `json:"average_10_day"`
-	AlertState   string      `json:"alert_state"`
+	CurrentValue float64      `json:"current_value"`
+	Average10Day float64      `json:"average_10_day"`
+	DaysInWindow int          `json:"days_in_window"`
+	AlertState   string       `json:"alert_state"`
 	History      []DailyValue `json:"history,omitempty"`
 }
 
@@ -100,9 +101,14 @@ func (e *BreadthEngine) Evaluate(history []DailyMarket) (IndicatorResult, error)
 		return IndicatorResult{}, err
 	}
 	current := values[len(values)-1]
+	n := e.Window
+	if len(values) < n {
+		n = len(values)
+	}
 	return IndicatorResult{
 		CurrentValue: current,
 		Average10Day: avg,
+		DaysInWindow: n,
 		AlertState:   e.Thresholds.AlertState(avg),
 	}, nil
 }
@@ -133,9 +139,14 @@ func (e *AdvanceDeclineEngine) Evaluate(history []DailyMarket) (IndicatorResult,
 		return IndicatorResult{}, err
 	}
 	current := values[len(values)-1]
+	n := e.Window
+	if len(values) < n {
+		n = len(values)
+	}
 	return IndicatorResult{
 		CurrentValue: current,
 		Average10Day: avg,
+		DaysInWindow: n,
 		AlertState:   e.Thresholds.AlertState(avg),
 	}, nil
 }

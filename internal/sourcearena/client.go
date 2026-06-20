@@ -113,6 +113,14 @@ func (c *Client) FetchSymbol(ctx context.Context, symbol string) (SymbolQuote, e
 	return items[0], nil
 }
 
+func (c *Client) FetchIndicators(ctx context.Context, symbol string) (*TechnicalIndicators, error) {
+	raw, err := c.getMarket(ctx, c.marketURL("name="+url.QueryEscape(symbol)+"&all_indicators&adjusted=1"), "indicators")
+	if err != nil {
+		return nil, err
+	}
+	return decodeTechnicalIndicators(raw)
+}
+
 func (c *Client) FetchDailyCandles(ctx context.Context, symbol string, from, to time.Time) ([]Candle, error) {
 	return c.FetchCandles(ctx, CandleRequest{
 		Symbol: symbol,

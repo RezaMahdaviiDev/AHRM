@@ -39,6 +39,8 @@ func (s *Server) registerPages(mux *http.ServeMux) {
 	mux.HandleFunc("GET /market", s.pageHandler("market.html", "Market"))
 	mux.HandleFunc("GET /covered-call", s.pageHandler("covered-call.html", "Covered Call"))
 	mux.HandleFunc("GET /matrix", s.pageHandler("matrix.html", "Matrix"))
+	mux.HandleFunc("GET /bull-spread", s.pageHandler("bull-spread.html", "Bull Call Spread"))
+	mux.HandleFunc("GET /chart", s.pageHandler("chart.html", "نمودار"))
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dashboard", http.StatusFound)
 	})

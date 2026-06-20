@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="{{.RefreshSeconds}}">
+  <title>{{.Title}} | AHRM</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Tahoma, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+    header { background: #1e293b; padding: 1rem 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+    header a { color: #93c5fd; text-decoration: none; }
+    .update-bar { background: #1e293b; padding: 0.5rem 2rem; font-size: 0.9rem; color: #94a3b8; border-bottom: 1px solid #334155; }
+    main { padding: 1.5rem 2rem; }
+    .card { background: #1e293b; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    h2 { margin: 0 0 1rem 0; font-size: 1.1rem; color: #93c5fd; }
+    .chart-wrap { position: relative; height: 320px; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { border: 1px solid #334155; padding: 0.5rem 0.75rem; text-align: center; }
+    th { background: #0f172a; font-size: 0.85rem; }
+    tr:nth-child(even) { background: #172033; }
+    .sig-buy    { color: #4ade80; font-weight: bold; }
+    .sig-sell   { color: #f87171; font-weight: bold; }
+    .sig-neutral { color: #94a3b8; }
+    .sum-box { display: flex; gap: 1.5rem; margin-bottom: 1rem; }
+    .sum-item { background: #0f172a; border-radius: 6px; padding: 0.5rem 1rem; font-size: 0.9rem; }
+    .no-data { color: #64748b; padding: 1rem 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>AHRM Scanner</strong>
+    <a href="/dashboard">داشبورد</a>
+    <a href="/arbitrage">آربیتراژ</a>
+    <a href="/hv">HV</a>
+    <a href="/market">بازار</a>
+    <a href="/matrix">ماتریس</a>
+    <a href="/covered-call">کاوردکال</a>
+    <a href="/bull-spread">بول اسپرد</a>
+    <a href="/chart">نمودار</a>
+  </header>
+  <div class="update-bar">آخرین به‌روزرسانی: {{.LastUpdatedTehran}} (ایران) · رفرش خودکار هر {{.RefreshMinutes}} دقیقه</div>
+  <main>
+    <h1>نمودار و اندیکاتورها — {{.Snapshot.Underlying.Name}}</h1>
+
+    <div class="card">
+      <h2>نمودار قیمت (۳۰ روز اخیر)</h2>
+      {{if .Snapshot.PriceChart}}
+      <div class="chart-wrap">
+        <canvas id="priceChart"></canvas>
+      </div>
+      <script>
+        (function() {
+          var raw = [{{range .Snapshot.PriceChart}}{"t":{{.Time}},"c":{{.Close}},"h":{{.High}},"l":{{.Low}}},{{end}}];
+          var labels = raw.map(function(d) {
+            return new Date(d.t * 1000).toLocaleDateString('fa-IR', {month:'numeric', day:'numeric'});
+          });
+          new Chart(document.getElementById('priceChart').getContext('2d'), {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: 'قیمت پایانی',
+                  data: raw.map(function(d){return d.c;}),
+                  borderColor: '#60a5fa',
+                  backgroundColor: 'rgba(96,165,250,0.08)',
+                  borderWidth: 2,
+                  pointRadius: 3,
+                  tension: 0.2,
+                  fill: true
+                },
+                {
+                  label: 'بالاترین',
+                  data: raw.map(function(d){return d.h;}),
+                  borderColor: '#4ade80',
+                  borderWidth: 1,
+                  pointRadius: 0,
+                  borderDash: [4,4],
+                  fill: false
+                },
+                {
+                  label: 'پایین‌ترین',
+                  data: raw.map(function(d){return d.l;}),
+                  borderColor: '#f87171',
+                  borderWidth: 1,
+                  pointRadius: 0,
+                  borderDash: [4,4],
+                  fill: false
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { labels: { color: '#e2e8f0', font: {family:'Tahoma'} } } },
+              scales: {
+                x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+                y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+              }
+            }
+          });
+        })();
+      </script>
+      {{else}}
+      <p class="no-data">داده‌ای برای رسم نمودار موجود نیست</p>
+      {{end}}
+    </div>
+
+    <div class="card">
+      <h2>اندیکاتورهای تکنیکال</h2>
+      {{if .Snapshot.Indicators}}
+      {{with .Snapshot.Indicators}}
+      <div class="sum-box">
+        <div class="sum-item sig-buy">خرید: {{.TechnicalSum.Buy}}</div>
+        <div class="sum-item sig-neutral">خنثی: {{.TechnicalSum.Neutral}}</div>
+        <div class="sum-item sig-sell">فروش: {{.TechnicalSum.Sell}}</div>
+      </div>
+      <table>
+        <thead><tr><th>اندیکاتور</th><th>مقدار</th><th>سیگنال</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>RSI</td>
+            <td>{{printf "%.2f" .RSI.Value}}</td>
+            <td class="{{if eq .RSI.Signal "buy"}}sig-buy{{else if eq .RSI.Signal "sell"}}sig-sell{{else}}sig-neutral{{end}}">{{.RSI.Signal}}</td>
+          </tr>
+          <tr>
+            <td>MFI</td>
+            <td>{{printf "%.2f" .MFI.Value}}</td>
+            <td class="{{if eq .MFI.Signal "buy"}}sig-buy{{else if eq .MFI.Signal "sell"}}sig-sell{{else}}sig-neutral{{end}}">{{.MFI.Signal}}</td>
+          </tr>
+          <tr>
+            <td>CCI</td>
+            <td>{{printf "%.2f" .CCI.Value}}</td>
+            <td class="{{if eq .CCI.Signal "buy"}}sig-buy{{else if eq .CCI.Signal "sell"}}sig-sell{{else}}sig-neutral{{end}}">{{.CCI.Signal}}</td>
+          </tr>
+          <tr>
+            <td>MACD</td>
+            <td>{{printf "%.2f" .MACD.Value}}</td>
+            <td class="{{if eq .MACD.Signal "buy"}}sig-buy{{else if eq .MACD.Signal "sell"}}sig-sell{{else}}sig-neutral{{end}}">{{.MACD.Signal}}</td>
+          </tr>
+          <tr>
+            <td>EMA 9</td>
+            <td>{{printf "%.0f" .EMA9.Value}}</td>
+            <td class="{{if eq .EMA9.Signal "buy"}}sig-buy{{else if eq .EMA9.Signal "sell"}}sig-sell{{else}}sig-neutral{{end}}">{{.EMA9.Signal}}</td>
+          </tr>
+          <tr>
+            <td>EMA 26</td>
+            <td>{{printf "%.0f" .EMA26.Value}}</td>
+            <td class="{{if eq .EMA26.Signal "buy"}}sig-buy{{else if eq .EMA26.Signal "sell"}}sig-sell{{else}}sig-neutral{{end}}">{{.EMA26.Signal}}</td>
+          </tr>
+          <tr>
+            <td>EMA 50</td>
+            <td>{{printf "%.0f" .EMA50.Value}}</td>
+            <td class="{{if eq .EMA50.Signal "buy"}}sig-buy{{else if eq .EMA50.Signal "sell"}}sig-sell{{else}}sig-neutral{{end}}">{{.EMA50.Signal}}</td>
+          </tr>
+          <tr>
+            <td>SMA</td>
+            <td>{{printf "%.0f" .SMA.Value}}</td>
+            <td class="{{if eq .SMA.Signal "buy"}}sig-buy{{else if eq .SMA.Signal "sell"}}sig-sell{{else}}sig-neutral{{end}}">{{.SMA.Signal}}</td>
+          </tr>
+          <tr>
+            <td>Bollinger Upper</td>
+            <td>{{printf "%.0f" .Bollinger.Upper}}</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>Bollinger Middle</td>
+            <td>{{printf "%.0f" .Bollinger.Middle}}</td>
+            <td class="{{if eq .Bollinger.Signal "buy"}}sig-buy{{else if eq .Bollinger.Signal "sell"}}sig-sell{{else}}sig-neutral{{end}}">{{.Bollinger.Signal}}</td>
+          </tr>
+          <tr>
+            <td>Bollinger Lower</td>
+            <td>{{printf "%.0f" .Bollinger.Lower}}</td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+      {{end}}
+      {{else}}
+      <p class="no-data">اندیکاتور در دسترس نیست (API در دسترس نیست یا هنوز دریافت نشده)</p>
+      {{end}}
+    </div>
+
+    {{if .Snapshot.Errors}}
+    <div class="card" style="border:1px solid #f87171;color:#fecaca">
+      <strong>خطاها</strong>
+      {{range .Snapshot.Errors}}<div style="font-size:12px;margin-top:4px">{{.}}</div>{{end}}
+    </div>
+    {{end}}
+  </main>
+</body>
+</html>

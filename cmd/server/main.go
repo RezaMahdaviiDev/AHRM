@@ -82,7 +82,13 @@ func main() {
 		AdvanceLowThreshold:   cfg.Alerts.AdvanceLowThreshold,
 	}, tgSender, baleSender, alerts.NewStore(pool))
 
-	scan := scanner.NewService(cfg, saClient, market.NewStore(pool), alertEngine)
+	var mStore market.DailyStore
+	if pool != nil {
+		mStore = market.NewStore(pool)
+	} else {
+		mStore = market.NewFileStore(filepath.Join(projectRoot(), "data", "market_history.json"))
+	}
+	scan := scanner.NewService(cfg, saClient, mStore, alertEngine)
 
 	dbReady := pool != nil
 	srv := server.New(cfg, pool, logger, filepath.Join(projectRoot(), "migrations"), dbReady, scan)

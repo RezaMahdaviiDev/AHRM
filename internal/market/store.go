@@ -9,6 +9,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type DailyStore interface {
+	UpsertToday(ctx context.Context, day indicators.DailyMarket) error
+	LastDays(ctx context.Context, days int) ([]indicators.DailyMarket, error)
+}
+
 type Store struct {
 	pool *pgxpool.Pool
 }

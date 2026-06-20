@@ -7,6 +7,7 @@ import (
 
 	"ahrm/internal/alerts"
 	"ahrm/internal/arbitrage"
+	"ahrm/internal/bullspread"
 	"ahrm/internal/config"
 	"ahrm/internal/coveredcall"
 	"ahrm/internal/domain"
@@ -25,12 +26,13 @@ const hvCandleLookbackDays = 180
 type Service struct {
 	cfg        *config.Config
 	client     *sourcearena.Client
-	marketStore *market.Store
+	marketStore market.DailyStore
 	pairEngine        *pairs.Engine
 	arbEngine         *arbitrage.Engine
 	coveredCallEngine *coveredcall.Engine
 	ivEngine          *ivcalc.Engine
 	hvEngine          *hv.Engine
+	bullSpreadEngine  *bullspread.Engine
 	breadth    *indicators.BreadthEngine
 	advance    *indicators.AdvanceDeclineEngine
 	matrix      *matrix.Engine
@@ -54,15 +56,19 @@ type Snapshot struct {
 	HVFetch       HVFetch                      `json:"hv_fetch"`
 	Breadth       indicators.IndicatorResult   `json:"breadth"`
 	AdvanceDecline indicators.IndicatorResult  `json:"advance_decline"`
-	Opportunities []arbitrage.Opportunity      `json:"opportunities"`
-	CoveredCalls      []coveredcall.CoveredCall    `json:"covered_calls"`
-	ImpliedVolatility []ivcalc.IVResult            `json:"implied_volatility"`
-	CallMatrices      []matrix.Matrix              `json:"call_matrices"`
-	PutMatrices   []matrix.Matrix              `json:"put_matrices"`
-	Errors        []string                     `json:"errors,omitempty"`
+	Opportunities     []arbitrage.Opportunity   `json:"opportunities"`
+	CoveredCalls      []coveredcall.CoveredCall `json:"covered_calls"`
+	ImpliedVolatility []ivcalc.IVResult         `json:"implied_volatility"`
+	CallMatrices      []matrix.Matrix           `json:"call_matrices"`
+	PutMatrices       []matrix.Matrix           `json:"put_matrices"`
+	BullSpreadsATM    []bullspread.Spread            `json:"bull_spreads_atm"`
+	BullSpreadsOTM    []bullspread.Spread            `json:"bull_spreads_otm"`
+	PriceChart        []sourcearena.Candle           `json:"price_chart"`
+	Indicators        *sourcearena.TechnicalIndicators `json:"indicators,omitempty"`
+	Errors            []string                       `json:"errors,omitempty"`
 }
 
-func NewService(cfg *config.Config, client *sourcearena.Client, marketStore *market.Store, alertEngine *alerts.Engine) *Service {
+func NewService(cfg *config.Config, client *sourcearena.Client, marketStore market.DailyStore, alertEngine *alerts.Engine) *Service {
 	matrixRules, _ := matrixalerts.LoadRules(cfg.MatrixAlertsFile)
 	return &Service{
 		cfg:         cfg,
@@ -81,6 +87,7 @@ func NewService(cfg *config.Config, client *sourcearena.Client, marketStore *mar
 			High: cfg.Alerts.AdvanceHighThreshold,
 			Low:  cfg.Alerts.AdvanceLowThreshold,
 		}),
+		bullSpreadEngine: bullspread.NewEngine(),
 		matrix:      matrix.NewEngine(),
 		matrixRules: matrixRules,
 		alerts:      alertEngine,
@@ -112,23 +119,6 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 	if len(symbols) > 0 {
 		today := market.ClassifyDay(symbols)
 		_ = s.marketStore.UpsertToday(ctx, today)
-		history, histErr := s.marketStore.LastDays(ctx, 10)
-		if histErr != nil {
-			snap.Errors = append(snap.Errors, fmt.Sprintf("market history: %v", histErr))
-		}
-		if len(history) == 0 {
-			history = []indicators.DailyMarket{today}
-		}
-		if breadth, bErr := s.breadth.Evaluate(history); bErr == nil {
-			snap.Breadth = breadth
-		} else {
-			snap.Errors = append(snap.Errors, fmt.Sprintf("breadth: %v", bErr))
-		}
-		if ad, aErr := s.advance.Evaluate(history); aErr == nil {
-			snap.AdvanceDecline = ad
-		} else {
-			snap.Errors = append(snap.Errors, fmt.Sprintf("advance_decline: %v", aErr))
-		}
 	}
 
 	from := time.Now().AddDate(0, 0, -hvCandleLookbackDays)
@@ -151,10 +141,43 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 	candles, err := s.client.FetchCandles(ctx, hvReq)
 	if err != nil {
 		snap.Errors = append(snap.Errors, fmt.Sprintf("candles: %v", err))
-	} else if hvResult, hvErr := s.hvEngine.Calculate(candles); hvErr == nil {
-		snap.HV = hvResult
 	} else {
-		snap.Errors = append(snap.Errors, fmt.Sprintf("hv: %v", hvErr))
+		if hvResult, hvErr := s.hvEngine.Calculate(candles); hvErr == nil {
+			snap.HV = hvResult
+		} else {
+			snap.Errors = append(snap.Errors, fmt.Sprintf("hv: %v", hvErr))
+		}
+		if len(candles) > 0 {
+			start := len(candles) - 30
+			if start < 0 {
+				start = 0
+			}
+			snap.PriceChart = candles[start:]
+		}
+		// Use candle history for past 9 days + today from market API (real-time) → consistent 10-day window
+		pastHistory := candleMarketHistory(candles, 9)
+		if len(pastHistory) > 0 && snap.Underlying.ClosePrice > 0 {
+			todayDay := indicators.DailyMarket{Positive: 0, Negative: 1, Total: 1}
+			if snap.Underlying.ClosePriceChangePct > 0 {
+				todayDay = indicators.DailyMarket{Positive: 1, Negative: 0, Total: 1}
+			}
+			history := append(pastHistory, todayDay)
+			if breadth, bErr := s.breadth.Evaluate(history); bErr == nil {
+				snap.Breadth = breadth
+			} else {
+				snap.Errors = append(snap.Errors, fmt.Sprintf("breadth: %v", bErr))
+			}
+			if ad, aErr := s.advance.Evaluate(history); aErr == nil {
+				snap.AdvanceDecline = ad
+			} else {
+				snap.Errors = append(snap.Errors, fmt.Sprintf("advance_decline: %v", aErr))
+			}
+		}
+	}
+	if indResult, indErr := s.client.FetchIndicators(ctx, domain.UnderlyingSymbol); indErr == nil {
+		snap.Indicators = indResult
+	} else {
+		snap.Errors = append(snap.Errors, fmt.Sprintf("indicators: %v", indErr))
 	}
 
 	if len(options) > 0 {
@@ -193,6 +216,10 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		if putMatrices, err := s.matrix.BuildPuts(options); err == nil {
 			snap.PutMatrices = putMatrices
 		}
+		if snap.Underlying.ClosePrice > 0 {
+			snap.BullSpreadsATM = s.bullSpreadEngine.CalculateAll(options, snap.Underlying.ClosePrice, bullspread.ATM)
+			snap.BullSpreadsOTM = s.bullSpreadEngine.CalculateAll(options, snap.Underlying.ClosePrice, bullspread.OTM)
+		}
 
 		prices := make(map[string]float64, len(options))
 		for _, opt := range options {
@@ -220,4 +247,28 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		}
 	}
 	return snap, nil
+}
+
+// candleMarketHistory derives DailyMarket records from consecutive candle close prices.
+// Returns up to `days` records: Positive=1 if close rose vs previous candle, else Negative=1.
+// Does NOT include today — caller appends today's value from the live market API.
+func candleMarketHistory(candles []sourcearena.Candle, days int) []indicators.DailyMarket {
+	if len(candles) < 2 {
+		return nil
+	}
+	needed := days + 1
+	start := len(candles) - needed
+	if start < 0 {
+		start = 0
+	}
+	sub := candles[start:]
+	out := make([]indicators.DailyMarket, 0, len(sub)-1)
+	for i := 1; i < len(sub); i++ {
+		if sub[i].Close > sub[i-1].Close {
+			out = append(out, indicators.DailyMarket{Positive: 1, Negative: 0, Total: 1})
+		} else {
+			out = append(out, indicators.DailyMarket{Positive: 0, Negative: 1, Total: 1})
+		}
+	}
+	return out
 }
