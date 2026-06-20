@@ -1,0 +1,37 @@
+# Local development PostgreSQL for AHRM.
+#
+# This brings up the same database engine used in production (Supabase = PostgreSQL),
+# so no application/migration code changes are needed between dev and prod — only the
+# SUPABASE_* connection values in .env differ (see .env.dev.example).
+#
+# Usage:
+#   make db-up      # start Postgres in the background
+#   make run        # run the app against it (with dev .env)
+#   make db-psql    # open a psql shell
+#   make db-down    # stop Postgres (data is preserved in the named volume)
+#
+# Data is persisted in the named volume `ahrm_pgdata`; it survives container restarts
+# and `make db-down`. To wipe it completely, run: docker compose down -v
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ahrm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ahrm
+      POSTGRES_USER: ahrm
+      # Dev-only password; never reuse in production.
+      POSTGRES_PASSWORD: ahrm
+    ports:
+      - "5432:5432"
+    volumes:
+      - ahrm_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ahrm -d ahrm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ahrm_pgdata:
