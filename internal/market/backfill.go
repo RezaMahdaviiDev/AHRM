@@ -13,9 +13,44 @@ const (
 	backfillLookbackDays = 30
 	backfillConcurrency  = 3
 	backfillCallDelay    = 150 * time.Millisecond
+
+	// backfillRequiredDays is the number of trading days the breadth/advance-decline
+	// indicators need (their moving-average window). Once the store already holds this
+	// many recent days, the per-symbol candle backfill is unnecessary.
+	backfillRequiredDays = 10
+	// backfillGateWindowDays is the recent calendar window inspected when deciding
+	// whether to skip the backfill. It comfortably contains backfillRequiredDays
+	// trading days plus weekends, so a recent multi-day gap drops the count below the
+	// requirement and re-triggers the backfill.
+	backfillGateWindowDays = 16
 )
 
 type dayAgg struct{ positive, negative, total int }
+
+// NeedsBackfill reports whether the expensive per-symbol candle backfill should run.
+//
+// In steady state the live market snapshot (ClassifyDay + UpsertToday) appends one row
+// per trading day, so the indicators' 10-day window can be served straight from SQL.
+// This guard returns false (skip) once the store already holds at least
+// backfillRequiredDays distinct days within the recent gate window, avoiding the
+// hundreds of candle requests the backfill would otherwise issue on every startup and
+// every daily run. It returns true on a cold start or when a recent gap has left the
+// window short, so the backfill still seeds/repairs history when actually needed.
+//
+// On a store error it returns true (fail-safe: prefer an extra backfill over a stale
+// indicator window).
+func NeedsBackfill(ctx context.Context, store DailyStore) (bool, error) {
+	if store == nil {
+		return false, nil
+	}
+	to := time.Now()
+	from := to.AddDate(0, 0, -backfillGateWindowDays)
+	existing, err := store.ExistingDays(ctx, from, to)
+	if err != nil {
+		return true, err
+	}
+	return len(existing) < backfillRequiredDays, nil
+}
 
 // BackfillHistory fetches per-symbol daily candles for the past backfillLookbackDays calendar
 // days and stores the resulting DailyMarket records for each past trading day.

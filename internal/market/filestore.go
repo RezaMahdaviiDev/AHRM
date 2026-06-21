@@ -120,6 +120,23 @@ func (s *FileStore) LastDays(_ context.Context, days int) ([]indicators.DailyMar
 	return out, nil
 }
 
+func (s *FileStore) ExistingDays(_ context.Context, from, to time.Time) (map[string]struct{}, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	fromStr := from.UTC().Format("2006-01-02")
+	toStr := to.UTC().Format("2006-01-02")
+
+	out := map[string]struct{}{}
+	for _, r := range s.load() {
+		// Date strings are zero-padded YYYY-MM-DD, so lexical comparison is chronological.
+		if r.Date >= fromStr && r.Date <= toStr {
+			out[r.Date] = struct{}{}
+		}
+	}
+	return out, nil
+}
+
 func (s *FileStore) load() []fileRecord {
 	data, err := os.ReadFile(s.path)
 	if err != nil {
