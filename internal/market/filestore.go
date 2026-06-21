@@ -112,6 +112,7 @@ func (s *FileStore) LastDays(_ context.Context, days int) ([]indicators.DailyMar
 	out := make([]indicators.DailyMarket, len(records))
 	for i, r := range records {
 		out[i] = indicators.DailyMarket{
+			Date:     r.Date,
 			Positive: r.Positive,
 			Negative: r.Negative,
 			Total:    r.Total,

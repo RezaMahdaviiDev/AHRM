@@ -34,8 +34,22 @@
     <h1>شاخص‌های بازار</h1>
 
     {{if .Snapshot.BackfillInProgress}}
+    {{$p := .Snapshot.BackfillProgress}}
     <div class="card" style="border-left: 4px solid #fbbf24;">
-      <p style="color:#fbbf24; margin:0">در حال دریافت داده‌های تاریخی بازار... میانگین‌ها پس از تکمیل (حدود ۵ دقیقه) به‌روز می‌شوند.</p>
+      <p style="color:#fbbf24; margin:0 0 0.5rem 0">
+        ⏳ در حال دریافت داده‌های تاریخی بازار...
+        {{if gt $p.TotalBatches 0}}
+          batch {{$p.CurrentBatch}} از {{$p.TotalBatches}}
+          ({{$p.Symbols}} نماد از {{$p.TotalSymbols}})
+        {{end}}
+      </p>
+      {{if gt $p.TotalBatches 0}}
+      {{$pct := divInt (mul100 $p.CurrentBatch) $p.TotalBatches}}
+      <div style="background:#334155;border-radius:4px;height:8px;overflow:hidden;">
+        <div style="background:#fbbf24;height:100%;width:{{$pct}}%;transition:width 0.3s;"></div>
+      </div>
+      <p class="muted" style="margin:0.3rem 0 0 0;font-size:0.8rem">{{$pct}}% — جدول روزانه پس از تکمیل (~۳۰ دقیقه) نمایش داده می‌شود</p>
+      {{end}}
     </div>
     {{end}}
 
@@ -54,6 +68,71 @@
       <p>وضعیت: <span class="alert-{{.Snapshot.AdvanceDecline.AlertState}}">{{if .Snapshot.AdvanceDecline.AlertState}}{{.Snapshot.AdvanceDecline.AlertState}}{{else}}—{{end}}</span></p>
       <p class="muted">آستانه بالا: 1.4 | آستانه پایین: 0.6 | AD = مثبت / منفی</p>
     </div>
+
+    {{if .Snapshot.DailyHistory}}
+    <div class="card">
+      <h3>تاریخچه روزانه بازار
+        <span class="muted" style="font-size:0.8rem"> — ردیف‌های روشن‌تر در پنجره ۱۰ روزه میانگین هستند</span>
+      </h3>
+      <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+        <thead>
+          <tr style="border-bottom:2px solid #334155;color:#94a3b8;">
+            <th style="padding:0.4rem 0.6rem;text-align:right">تاریخ</th>
+            <th style="padding:0.4rem;text-align:center">وضعیت</th>
+            <th style="padding:0.4rem;text-align:center">مثبت</th>
+            <th style="padding:0.4rem;text-align:center">منفی</th>
+            <th style="padding:0.4rem;text-align:center">کل</th>
+            <th style="padding:0.4rem;text-align:center">٪ مثبت</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Snapshot.DailyHistory}}
+          {{if gt .Positive .Negative}}
+            {{if .InWindow}}
+            <tr style="border-bottom:1px solid #14532d;background:#052e16;">
+              <td style="padding:0.4rem 0.6rem;color:#86efac;font-weight:600">{{toJalali .Date}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#86efac;font-weight:700">▲ مثبت</td>
+              <td style="padding:0.4rem;text-align:center;color:#86efac">{{.Positive}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#f87171">{{.Negative}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#e2e8f0">{{.Total}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#86efac;font-weight:600">{{printf "%.1f" .PctPositive}}٪</td>
+            </tr>
+            {{else}}
+            <tr style="border-bottom:1px solid #0f172a;opacity:0.65;">
+              <td style="padding:0.4rem 0.6rem;color:#86efac">{{toJalali .Date}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#86efac">▲ مثبت</td>
+              <td style="padding:0.4rem;text-align:center;color:#86efac">{{.Positive}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#f87171">{{.Negative}}</td>
+              <td style="padding:0.4rem;text-align:center">{{.Total}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#86efac">{{printf "%.1f" .PctPositive}}٪</td>
+            </tr>
+            {{end}}
+          {{else}}
+            {{if .InWindow}}
+            <tr style="border-bottom:1px solid #450a0a;background:#2d0a0a;">
+              <td style="padding:0.4rem 0.6rem;color:#f87171;font-weight:600">{{toJalali .Date}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#f87171;font-weight:700">▼ منفی</td>
+              <td style="padding:0.4rem;text-align:center;color:#86efac">{{.Positive}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#f87171">{{.Negative}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#e2e8f0">{{.Total}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#f87171;font-weight:600">{{printf "%.1f" .PctPositive}}٪</td>
+            </tr>
+            {{else}}
+            <tr style="border-bottom:1px solid #0f172a;opacity:0.65;">
+              <td style="padding:0.4rem 0.6rem;color:#f87171">{{toJalali .Date}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#f87171">▼ منفی</td>
+              <td style="padding:0.4rem;text-align:center;color:#86efac">{{.Positive}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#f87171">{{.Negative}}</td>
+              <td style="padding:0.4rem;text-align:center">{{.Total}}</td>
+              <td style="padding:0.4rem;text-align:center;color:#f87171">{{printf "%.1f" .PctPositive}}٪</td>
+            </tr>
+            {{end}}
+          {{end}}
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{end}}
 
     {{if .Snapshot.Errors}}
     <div class="card">

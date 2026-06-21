@@ -58,7 +58,7 @@ func (s *Store) LastDays(ctx context.Context, days int) ([]indicators.DailyMarke
 		return nil, nil
 	}
 	rows, err := s.pool.Query(ctx, `
-		SELECT positive, negative, total
+		SELECT day, positive, negative, total
 		FROM market_daily_stats
 		ORDER BY day DESC
 		LIMIT $1`, days)
@@ -70,9 +70,11 @@ func (s *Store) LastDays(ctx context.Context, days int) ([]indicators.DailyMarke
 	var out []indicators.DailyMarket
 	for rows.Next() {
 		var day indicators.DailyMarket
-		if err := rows.Scan(&day.Positive, &day.Negative, &day.Total); err != nil {
+		var t time.Time
+		if err := rows.Scan(&t, &day.Positive, &day.Negative, &day.Total); err != nil {
 			return nil, err
 		}
+		day.Date = t.UTC().Format("2006-01-02")
 		out = append(out, day)
 	}
 	if err := rows.Err(); err != nil {

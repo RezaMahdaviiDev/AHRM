@@ -5,6 +5,7 @@ import (
 )
 
 type DailyMarket struct {
+	Date     string // YYYY-MM-DD; empty when not needed
 	Positive int
 	Negative int
 	Total    int

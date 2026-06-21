@@ -63,8 +63,11 @@ func NeedsBackfill(ctx context.Context, store DailyStore) (bool, error) {
 // aggregated day stats are written to the store immediately, so progress is preserved
 // if the context is cancelled mid-way. A pause of backfillBatchPause is inserted
 // between batches to avoid hammering the API.
+// ProgressFunc is called after each batch with (currentBatch, totalBatches, symbolsDone, totalSymbols).
+type ProgressFunc func(batch, totalBatches, symbolsDone, totalSymbols int)
+
 func BackfillHistory(ctx context.Context, client *sourcearena.Client,
-	symbols []sourcearena.SymbolQuote, store DailyStore) error {
+	symbols []sourcearena.SymbolQuote, store DailyStore, onProgress ProgressFunc) error {
 
 	traded := make([]string, 0, len(symbols))
 	for _, s := range symbols {
@@ -80,7 +83,16 @@ func BackfillHistory(ctx context.Context, client *sourcearena.Client,
 	to := time.Now()
 	today := time.Now().UTC().Format("2006-01-02")
 
+	// allDays accumulates ALL batches before writing — each day's totals
+	// reflect the full symbol universe, not just the last batch processed.
+	allDays := map[string]*dayAgg{}
+
 	total := len(traded)
+	totalBatches := (total + backfillBatchSize - 1) / backfillBatchSize
+	if onProgress != nil {
+		onProgress(0, totalBatches, 0, total)
+	}
+
 	for batchStart := 0; batchStart < total; batchStart += backfillBatchSize {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -96,24 +108,25 @@ func BackfillHistory(ctx context.Context, client *sourcearena.Client,
 
 		perDay := processBatch(ctx, client, batch, from, to)
 
-		daysWritten := 0
 		for dateStr, agg := range perDay {
 			if dateStr == today {
 				continue
 			}
-			t, err := time.Parse("2006-01-02", dateStr)
-			if err != nil {
-				continue
+			existing := allDays[dateStr]
+			if existing == nil {
+				existing = &dayAgg{}
+				allDays[dateStr] = existing
 			}
-			_ = store.UpsertDay(ctx, t, indicators.DailyMarket{
-				Positive: agg.positive,
-				Negative: agg.negative,
-				Total:    agg.total,
-			})
-			daysWritten++
+			existing.positive += agg.positive
+			existing.negative += agg.negative
+			existing.total += agg.total
 		}
 
-		slog.Info("backfill batch done", "batch", batchStart/backfillBatchSize+1, "days_aggregated", len(perDay), "days_written", daysWritten)
+		batchNum := batchStart/backfillBatchSize + 1
+		slog.Info("backfill batch done", "batch", batchNum, "days_in_batch", len(perDay), "days_accumulated", len(allDays))
+		if onProgress != nil {
+			onProgress(batchNum, totalBatches, batchEnd, total)
+		}
 
 		if batchEnd < total {
 			select {
@@ -123,6 +136,22 @@ func BackfillHistory(ctx context.Context, client *sourcearena.Client,
 			}
 		}
 	}
+
+	// Write final accumulated results once all batches are done.
+	daysWritten := 0
+	for dateStr, agg := range allDays {
+		t, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			continue
+		}
+		_ = store.UpsertDay(ctx, t, indicators.DailyMarket{
+			Positive: agg.positive,
+			Negative: agg.negative,
+			Total:    agg.total,
+		})
+		daysWritten++
+	}
+	slog.Info("backfill complete", "days_written", daysWritten)
 	return nil
 }
 
