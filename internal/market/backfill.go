@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -11,8 +12,10 @@ import (
 
 const (
 	backfillLookbackDays = 30
-	backfillConcurrency  = 3
-	backfillCallDelay    = 150 * time.Millisecond
+	backfillConcurrency  = 1
+	backfillCallDelay    = 1 * time.Second
+	backfillBatchSize    = 20
+	backfillBatchPause   = 5 * time.Second
 
 	// backfillRequiredDays is the number of trading days the breadth/advance-decline
 	// indicators need (their moving-average window). Once the store already holds this
@@ -52,16 +55,20 @@ func NeedsBackfill(ctx context.Context, store DailyStore) (bool, error) {
 	return len(existing) < backfillRequiredDays, nil
 }
 
-// BackfillHistory fetches per-symbol daily candles for the past backfillLookbackDays calendar
-// days and stores the resulting DailyMarket records for each past trading day.
+// BackfillHistory fetches per-symbol daily candles for the past backfillLookbackDays
+// calendar days and stores the resulting DailyMarket records for each past trading day.
 // Today is skipped — today's data comes from the live market API (ClassifyDay).
-// Safe to call concurrently; only writes dates not already covered by the store.
+//
+// Symbols are processed in batches of backfillBatchSize. After each batch the
+// aggregated day stats are written to the store immediately, so progress is preserved
+// if the context is cancelled mid-way. A pause of backfillBatchPause is inserted
+// between batches to avoid hammering the API.
 func BackfillHistory(ctx context.Context, client *sourcearena.Client,
 	symbols []sourcearena.SymbolQuote, store DailyStore) error {
 
 	traded := make([]string, 0, len(symbols))
 	for _, s := range symbols {
-		if s.TradeValue > 0 {
+		if s.TradeValue > 0 && !isOptionSymbol(s.Name) {
 			traded = append(traded, s.Name)
 		}
 	}
@@ -71,6 +78,56 @@ func BackfillHistory(ctx context.Context, client *sourcearena.Client,
 
 	from := time.Now().AddDate(0, 0, -backfillLookbackDays)
 	to := time.Now()
+	today := time.Now().UTC().Format("2006-01-02")
+
+	total := len(traded)
+	for batchStart := 0; batchStart < total; batchStart += backfillBatchSize {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		batchEnd := batchStart + backfillBatchSize
+		if batchEnd > total {
+			batchEnd = total
+		}
+		batch := traded[batchStart:batchEnd]
+
+		slog.Info("backfill batch started", "batch", batchStart/backfillBatchSize+1, "symbols", len(batch), "progress", batchEnd, "total", total)
+
+		perDay := processBatch(ctx, client, batch, from, to)
+
+		daysWritten := 0
+		for dateStr, agg := range perDay {
+			if dateStr == today {
+				continue
+			}
+			t, err := time.Parse("2006-01-02", dateStr)
+			if err != nil {
+				continue
+			}
+			_ = store.UpsertDay(ctx, t, indicators.DailyMarket{
+				Positive: agg.positive,
+				Negative: agg.negative,
+				Total:    agg.total,
+			})
+			daysWritten++
+		}
+
+		slog.Info("backfill batch done", "batch", batchStart/backfillBatchSize+1, "days_aggregated", len(perDay), "days_written", daysWritten)
+
+		if batchEnd < total {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(backfillBatchPause):
+			}
+		}
+	}
+	return nil
+}
+
+func processBatch(ctx context.Context, client *sourcearena.Client,
+	symbols []string, from, to time.Time) map[string]*dayAgg {
 
 	var mu sync.Mutex
 	perDay := map[string]*dayAgg{}
@@ -78,11 +135,9 @@ func BackfillHistory(ctx context.Context, client *sourcearena.Client,
 	sem := make(chan struct{}, backfillConcurrency)
 	var wg sync.WaitGroup
 
-	for _, name := range traded {
-		select {
-		case <-ctx.Done():
+	for _, name := range symbols {
+		if ctx.Err() != nil {
 			break
-		default:
 		}
 		wg.Add(1)
 		sem <- struct{}{}
@@ -98,9 +153,15 @@ func BackfillHistory(ctx context.Context, client *sourcearena.Client,
 				Resolution: sourcearena.Resolution1D,
 				Type:       sourcearena.AdjustCapAndDividend,
 			})
-			if err != nil || len(candles) < 2 {
+			if err != nil {
+				slog.Debug("backfill candle error", "sym", sym, "err", err)
 				return
 			}
+			if len(candles) < 2 {
+				slog.Debug("backfill candle too few", "sym", sym, "count", len(candles))
+				return
+			}
+			slog.Debug("backfill candle ok", "sym", sym, "count", len(candles), "first_time", candles[0].Time)
 
 			mu.Lock()
 			for i := 1; i < len(candles); i++ {
@@ -127,21 +188,18 @@ func BackfillHistory(ctx context.Context, client *sourcearena.Client,
 		}(name)
 	}
 	wg.Wait()
+	return perDay
+}
 
-	today := time.Now().UTC().Format("2006-01-02")
-	for dateStr, agg := range perDay {
-		if dateStr == today {
-			continue
+// isOptionSymbol returns true for TSE derivative/option symbols.
+// Call options start with ض and put options start with ط, but both
+// contain digits (e.g. ضملت4019, طهرم5027). Regular equity symbols
+// are pure Persian text with no digits, so a digit check is sufficient.
+func isOptionSymbol(name string) bool {
+	for _, r := range name {
+		if r >= '0' && r <= '9' {
+			return true
 		}
-		t, err := time.Parse("2006-01-02", dateStr)
-		if err != nil {
-			continue
-		}
-		_ = store.UpsertDay(ctx, t, indicators.DailyMarket{
-			Positive: agg.positive,
-			Negative: agg.negative,
-			Total:    agg.total,
-		})
 	}
-	return nil
+	return false
 }
