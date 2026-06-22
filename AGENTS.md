@@ -1,6 +1,8 @@
 # AGENTS.md
 
-Operating guidance for AI agents working on AHRM.
+Operating guidance for AI agents working on AHRM — a Go service that scans the Iranian
+`اهرم` options chain, computes arbitrage / volatility / breadth signals, and pushes
+Telegram + Bale alerts.
 
 ## Living documentation lifecycle
 
@@ -12,7 +14,7 @@ you start, and update them **after** you change things.
   understand what `اهرم`/`ضهرم`/`طهرم`, "Return (R)", "Static ROI", "Breadth Thrust", etc.
   actually mean, and which synonyms to avoid.
 - `docs/adr/` — Architecture Decision Records: short notes on hard-to-reverse, surprising
-  decisions (why a JSON file-store fallback exists, why SourceArena needs Iranian egress,
+  decisions (PostgreSQL prod + SQLite local default, why SourceArena needs Iranian egress,
   why HV uses a 180-day window, …).
 - `.claude/skills/` — reusable engineering SOPs (auto-discovered by Cursor and Claude
   Code). See `.claude/skills/README.md`.
@@ -49,7 +51,33 @@ Use the installed skills rather than reinventing the process:
 
 ## Build / test / run
 
-Standard commands live in the `Makefile` and `README.md` — prefer those. In short:
-`make run` (server on `:8080`, no external services required — falls back to a JSON file
-store), `make test`, `make test-integration` (needs a configured PostgreSQL/Supabase, else
-self-skips), and `make build`.
+Standard commands live in the `Makefile` and `README.md` — prefer those.
+
+- `make run` — start the server on `:8080`. **No external services are required**: when
+  Supabase is not configured the scanner persists market history to a local SQLite file
+  (`data/market.db`). `/health` (liveness) and `/ready` (readiness JSON) need no external
+  deps and are the quickest way to confirm the server is up.
+- `make test` / `make build` — unit tests and binary build. The suite is expected to be
+  green; CI (`.github/workflows/ci.yml`) runs `go vet` + `go build` + `go test ./...` on
+  every PR using the Go version in `go.mod`.
+- `make test-integration` — needs a configured PostgreSQL/Supabase, else self-skips.
+
+## Cursor Cloud specific instructions
+
+Durable, non-obvious notes for cloud agents (the dependency-refresh `go mod download` is
+handled by the startup update script — don't add it here):
+
+- **The toolchain is Go 1.25** (`go.mod`). The system Go may be older; the Go toolchain
+  auto-downloads the right version on first build, so the initial `go build`/`go test` can
+  be slow while it fetches.
+- **`.env` is optional.** `config.Load()` uses `godotenv` and silently ignores a missing
+  `.env`, falling back to defaults in `internal/config/config.go`. Copy `.env.example` to
+  `.env` only when you need to set tokens/DB creds.
+- **Live market data requires `SOURCEARENA_API_TOKEN` *and* Iranian network egress**
+  (directly or via `SOURCEARENA_HTTP_PROXY`). From outside Iran the SourceArena API is
+  unreachable, so the dashboard, `/arbitrage`, `/hv`, `/market`, `/matrix` pages render but
+  show zeros and a "sourcearena client not configured / unreachable" notice. This is
+  expected in the cloud VM and is not a setup failure. See `docs/adr/0003-*`.
+- **The UI is RTL/Persian.**
+- **Lint:** `go vet ./...` is clean; `gofmt -l .` reports several pre-existing unformatted
+  files — do not reformat them unless that is the task.

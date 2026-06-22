@@ -114,8 +114,10 @@ _Avoid_: writing it as plain "R" without "Bull Spread" context; sود/ریسک a
 
 **Daily Market Stats**:
 For one trading day, the count of traded symbols that closed Positive, Negative, or in
-total, across the whole market (not just AHRM).
-_Avoid_: advancers/decliners (those are derived views, not the raw counts)
+total, across the traded **non-option** market (option contracts themselves are excluded
+from the universe, only their underlyings count).
+_Avoid_: advancers/decliners (those are derived views, not the raw counts); including
+option symbols in the universe
 
 **Positive / Negative**:
 A symbol is Positive when its close changed by more than +0.5% on the day, Negative when

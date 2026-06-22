@@ -1,11 +1,13 @@
-# PostgreSQL for persistence, with a JSON file-store fallback
+# PostgreSQL in production, SQLite as the local fallback
 
 Persistent state (market daily stats, alert history, raw API responses) lives in
 PostgreSQL (Supabase in production), accessed via `pgx` with SQL migrations applied on
-startup. When Supabase is not configured, the scanner transparently falls back to a JSON
-file store for market history (`internal/market/filestore.go`).
+startup. When Supabase is **not** configured, the scanner transparently falls back to an
+embedded **SQLite** database (`data/market.db`, `internal/market/sqlitestore.go`) selected
+behind the `market.DailyStore` interface in `cmd/server/main.go`.
 
-The fallback is deliberate, not a leftover: it lets the app run locally and in CI with no
-database, keeping the dev loop frictionless. The cost is two storage implementations of
-`market.DailyStore` that must be kept in sync, and the file store is capped at 30 days
-with no concurrency guarantees beyond a single process.
+The SQLite fallback is deliberate: it gives local development and CI a real, persistent SQL
+store with zero setup (no Docker, no server) while production keeps managed Postgres. The
+cost is two store implementations of `market.DailyStore` to keep in sync. (An older JSON
+file store, `internal/market/filestore.go`, predates the SQLite store and is no longer
+wired in.)
