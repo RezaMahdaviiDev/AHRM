@@ -70,11 +70,31 @@ func TestCalculateAllIgnoresPuts(t *testing.T) {
 	}
 }
 
-func TestCalculateAllCollectsPerOptionErrors(t *testing.T) {
+func TestCalculateAllSkipsOutOfBoundsPriceSilently(t *testing.T) {
+	// A call quoting a price at/above the underlying is outside the no-arbitrage
+	// bounds. Illiquid/stale quotes like this are skipped silently (no result and no
+	// error) so they don't flood the dashboard's error card.
 	engine := ivcalc.NewEngine()
 	engine.Now = func() time.Time { return time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC) }
 	opts := []sourcearena.Option{
 		{Name: "ضهرم1200", ClosePrice: 50000, StrikePrice: 12000, ExpiryDate: "1405/12/15"},
+	}
+	got, errs := engine.CalculateAll(opts, 25000, 0.20)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(got))
+	}
+	if len(errs) != 0 {
+		t.Fatalf("out-of-bounds price should be skipped silently; got errs=%v", errs)
+	}
+}
+
+func TestCalculateAllCollectsPerOptionErrors(t *testing.T) {
+	// Genuinely unexpected failures (here, an invalid zero strike) are collected as
+	// per-option errors rather than skipped silently.
+	engine := ivcalc.NewEngine()
+	engine.Now = func() time.Time { return time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC) }
+	opts := []sourcearena.Option{
+		{Name: "ضهرم1200", ClosePrice: 1000, StrikePrice: 0, ExpiryDate: "1405/12/15"},
 	}
 	got, errs := engine.CalculateAll(opts, 25000, 0.20)
 	if len(got) != 0 {
