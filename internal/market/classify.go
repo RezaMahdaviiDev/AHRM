@@ -8,7 +8,7 @@ import (
 func ClassifyDay(symbols []sourcearena.SymbolQuote) indicators.DailyMarket {
 	var positive, negative, total int
 	for _, sym := range symbols {
-		if sym.TradeValue <= 0 {
+		if sym.TradeValue <= 0 || isOptionSymbol(sym.Name) {
 			continue
 		}
 		total++

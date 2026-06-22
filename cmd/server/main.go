@@ -87,7 +87,12 @@ func main() {
 	if pool != nil {
 		mStore = market.NewStore(pool)
 	} else {
-		mStore = market.NewFileStore(filepath.Join(projectRoot(), "data", "market_history.json"))
+		sqliteStore, sqliteErr := market.NewSQLiteStore(filepath.Join(projectRoot(), "data", "market.db"))
+		if sqliteErr != nil {
+			logger.Error("sqlite store init failed", "error", sqliteErr)
+			os.Exit(1)
+		}
+		mStore = sqliteStore
 	}
 	scan := scanner.NewService(cfg, saClient, mStore, alertEngine)
 

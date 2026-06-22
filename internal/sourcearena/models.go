@@ -77,7 +77,7 @@ type Candle struct {
 	Low    float64 `json:"l"`
 	Open   float64 `json:"o"`
 	Volume float64 `json:"v"`
-	Time   int64   `json:"t"`
+	Time   int64   `json:"timestamp"`
 }
 
 func decodeOptions(raw json.RawMessage) ([]Option, error) {

@@ -3,6 +3,7 @@ package scanner
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -24,11 +25,20 @@ import (
 
 const hvCandleLookbackDays = 180
 
+type BackfillProgress struct {
+	CurrentBatch int
+	TotalBatches int
+	Symbols      int
+	TotalSymbols int
+}
+
 type Service struct {
 	cfg        *config.Config
 	client     *sourcearena.Client
 	marketStore market.DailyStore
-	backfilling atomic.Bool
+	backfilling     atomic.Bool
+	bfMu            sync.Mutex
+	bfProgress      BackfillProgress
 	pairEngine        *pairs.Engine
 	arbEngine         *arbitrage.Engine
 	coveredCallEngine *coveredcall.Engine
@@ -51,6 +61,16 @@ type HVFetch struct {
 	TypeLabel  string    `json:"type_label"`
 }
 
+// DailyRow is a single day's market breadth data for display in the UI.
+type DailyRow struct {
+	Date        string  `json:"date"`
+	Positive    int     `json:"positive"`
+	Negative    int     `json:"negative"`
+	Total       int     `json:"total"`
+	PctPositive float64 `json:"pct_positive"`
+	InWindow    bool    `json:"in_window"` // true = part of the 10-day MA window
+}
+
 type Snapshot struct {
 	GeneratedAt   time.Time                    `json:"generated_at"`
 	Underlying    sourcearena.SymbolQuote      `json:"underlying"`
@@ -58,16 +78,18 @@ type Snapshot struct {
 	HVFetch       HVFetch                      `json:"hv_fetch"`
 	Breadth       indicators.IndicatorResult   `json:"breadth"`
 	AdvanceDecline indicators.IndicatorResult  `json:"advance_decline"`
-	Opportunities     []arbitrage.Opportunity   `json:"opportunities"`
-	CoveredCalls      []coveredcall.CoveredCall `json:"covered_calls"`
-	ImpliedVolatility []ivcalc.IVResult         `json:"implied_volatility"`
-	CallMatrices      []matrix.Matrix           `json:"call_matrices"`
-	PutMatrices       []matrix.Matrix           `json:"put_matrices"`
+	DailyHistory      []DailyRow                    `json:"daily_history,omitempty"`
+	Opportunities     []arbitrage.Opportunity       `json:"opportunities"`
+	CoveredCalls      []coveredcall.CoveredCall     `json:"covered_calls"`
+	ImpliedVolatility []ivcalc.IVResult             `json:"implied_volatility"`
+	CallMatrices      []matrix.Matrix               `json:"call_matrices"`
+	PutMatrices       []matrix.Matrix               `json:"put_matrices"`
 	BullSpreadsATM    []bullspread.Spread            `json:"bull_spreads_atm"`
 	BullSpreadsOTM    []bullspread.Spread            `json:"bull_spreads_otm"`
 	PriceChart        []sourcearena.Candle           `json:"price_chart"`
 	Indicators        *sourcearena.TechnicalIndicators `json:"indicators,omitempty"`
 	BackfillInProgress bool                          `json:"backfill_in_progress,omitempty"`
+	BackfillProgress   BackfillProgress              `json:"backfill_progress,omitempty"`
 	Errors            []string                       `json:"errors,omitempty"`
 }
 
@@ -98,7 +120,10 @@ func NewService(cfg *config.Config, client *sourcearena.Client, marketStore mark
 }
 
 func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
-	snap := Snapshot{GeneratedAt: time.Now().UTC(), BackfillInProgress: s.backfilling.Load()}
+	s.bfMu.Lock()
+	bfProg := s.bfProgress
+	s.bfMu.Unlock()
+	snap := Snapshot{GeneratedAt: time.Now().UTC(), BackfillInProgress: s.backfilling.Load(), BackfillProgress: bfProg}
 	if s.client == nil {
 		snap.Errors = append(snap.Errors, "sourcearena client not configured")
 		return snap, nil
@@ -126,7 +151,7 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 	var history []indicators.DailyMarket
 	if s.marketStore != nil {
 		var histErr error
-		history, histErr = s.marketStore.LastDays(ctx, 10)
+		history, histErr = s.marketStore.LastDays(ctx, 30)
 		if histErr != nil {
 			snap.Errors = append(snap.Errors, fmt.Sprintf("market history: %v", histErr))
 		}
@@ -142,6 +167,30 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		} else {
 			snap.Errors = append(snap.Errors, fmt.Sprintf("advance_decline: %v", aErr))
 		}
+		rows := make([]DailyRow, 0, len(history))
+		windowStart := len(history) - 10
+		if windowStart < 0 {
+			windowStart = 0
+		}
+		for i, d := range history {
+			var pct float64
+			if d.Total > 0 {
+				pct = float64(d.Positive) / float64(d.Total) * 100
+			}
+			rows = append(rows, DailyRow{
+				Date:        d.Date,
+				Positive:    d.Positive,
+				Negative:    d.Negative,
+				Total:       d.Total,
+				PctPositive: pct,
+				InWindow:    i >= windowStart,
+			})
+		}
+		// reverse for newest-first display
+		for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
+			rows[i], rows[j] = rows[j], rows[i]
+		}
+		snap.DailyHistory = rows
 	}
 
 	if !snap.BackfillInProgress {
@@ -286,16 +335,32 @@ func (s *Service) runBackfill(ctx context.Context) {
 	if s.client == nil || s.marketStore == nil {
 		return
 	}
+	// Mark backfilling early so the very first snapshot shows the banner.
 	s.backfilling.Store(true)
 	defer s.backfilling.Store(false)
+	// Skip the per-symbol candle backfill when SQL already covers the recent
+	// indicator window; on a store error NeedsBackfill returns true (fail-safe).
+	if need, _ := market.NeedsBackfill(ctx, s.marketStore); !need {
+		return
+	}
 
-	bfCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	bfCtx, cancel := context.WithTimeout(ctx, 60*time.Minute)
 	defer cancel()
 	symbols, err := s.client.FetchAllSymbols(bfCtx)
 	if err != nil || len(symbols) == 0 {
 		return
 	}
-	_ = market.BackfillHistory(bfCtx, s.client, symbols, s.marketStore)
+	onProgress := func(batch, totalBatches, symbolsDone, totalSymbols int) {
+		s.bfMu.Lock()
+		s.bfProgress = BackfillProgress{
+			CurrentBatch: batch,
+			TotalBatches: totalBatches,
+			Symbols:      symbolsDone,
+			TotalSymbols: totalSymbols,
+		}
+		s.bfMu.Unlock()
+	}
+	_ = market.BackfillHistory(bfCtx, s.client, symbols, s.marketStore, onProgress)
 }
 
 func nextTehranTime(hour, minute int) time.Time {

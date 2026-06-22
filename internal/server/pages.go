@@ -48,7 +48,15 @@ func (s *Server) registerPages(mux *http.ServeMux) {
 
 func (s *Server) initTemplates() {
 	s.tplOnce.Do(func() {
-		tpl, err := template.ParseFS(templateFS, "templates/*.html")
+		funcs := template.FuncMap{
+			"mul100":   func(a int) int { return a * 100 },
+			"divInt":   func(a, b int) int {
+				if b == 0 { return 0 }
+				return a / b
+			},
+			"toJalali": toJalali,
+		}
+		tpl, err := template.New("").Funcs(funcs).ParseFS(templateFS, "templates/*.html")
 		if err == nil {
 			s.templates = tpl
 		}

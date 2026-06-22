@@ -4,3 +4,6 @@ bin/
 coverage.out
 coverage.html
 .DS_Store
+vendor/
+vendor.zip
+data/
