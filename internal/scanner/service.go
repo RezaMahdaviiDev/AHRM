@@ -33,9 +33,11 @@ type BackfillProgress struct {
 }
 
 type Service struct {
-	cfg        *config.Config
-	client     *sourcearena.Client
-	marketStore market.DailyStore
+	cfg           *config.Config
+	client        *sourcearena.Client
+	marketStore   market.DailyStore
+	symbolStore   market.SymbolSnapshotStore
+	registryStore market.SymbolRegistryStore
 	backfilling     atomic.Bool
 	bfMu            sync.Mutex
 	bfProgress      BackfillProgress
@@ -88,17 +90,21 @@ type Snapshot struct {
 	BullSpreadsOTM    []bullspread.Spread            `json:"bull_spreads_otm"`
 	PriceChart        []sourcearena.Candle           `json:"price_chart"`
 	Indicators        *sourcearena.TechnicalIndicators `json:"indicators,omitempty"`
+	SymbolRows        []indicators.SymbolRow         `json:"symbol_rows,omitempty"`
+	QueueCandidates   []market.QueueCandidate        `json:"queue_candidates,omitempty"`
 	BackfillInProgress bool                          `json:"backfill_in_progress,omitempty"`
 	BackfillProgress   BackfillProgress              `json:"backfill_progress,omitempty"`
 	Errors            []string                       `json:"errors,omitempty"`
 }
 
-func NewService(cfg *config.Config, client *sourcearena.Client, marketStore market.DailyStore, alertEngine *alerts.Engine) *Service {
+func NewService(cfg *config.Config, client *sourcearena.Client, marketStore market.DailyStore, symbolStore market.SymbolSnapshotStore, registryStore market.SymbolRegistryStore, alertEngine *alerts.Engine) *Service {
 	matrixRules, _ := matrixalerts.LoadRules(cfg.MatrixAlertsFile)
 	return &Service{
-		cfg:         cfg,
-		client:      client,
-		marketStore: marketStore,
+		cfg:           cfg,
+		client:        client,
+		marketStore:   marketStore,
+		symbolStore:   symbolStore,
+		registryStore: registryStore,
 		pairEngine:        pairs.NewEngine(),
 		arbEngine:         arbitrage.NewEngine(),
 		coveredCallEngine: coveredcall.NewEngine(),
@@ -144,11 +150,32 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		snap.Underlying = underlying
 	}
 
-	// Only record today's breadth snapshot after market close (18:00 Tehran time).
-	// Intra-day snapshots use incomplete data and would corrupt the historical record.
-	if isTehranAfter(18, 0) && s.marketStore != nil && len(symbols) > 0 {
+	// Scan for buy-queue (صف خرید) candidates suitable for سرخطی tomorrow.
+	if len(symbols) > 0 {
+		var newSyms []string
+		if s.registryStore != nil {
+			names := make([]string, 0, len(symbols))
+			for _, sym := range symbols {
+				names = append(names, sym.Name)
+			}
+			newSyms, _ = s.registryStore.RegisterSymbols(ctx, names)
+		}
+		newSymsSet := make(map[string]bool, len(newSyms))
+		for _, n := range newSyms {
+			newSymsSet[n] = true
+		}
+		snap.QueueCandidates = market.ScanQueue(symbols, newSymsSet)
+	}
+
+	// Record today's breadth snapshot after 13:00 Tehran time (post-session data).
+	if isTehranAfter(13, 0) && s.marketStore != nil && len(symbols) > 0 {
 		today := market.ClassifyDay(symbols)
 		_ = s.marketStore.UpsertToday(ctx, today)
+		if s.symbolStore != nil {
+			symRows := market.SymbolRows(symbols)
+			date := time.Now().UTC().Format("2006-01-02")
+			_ = s.symbolStore.UpsertSymbolSnapshot(ctx, date, symRows)
+		}
 	}
 	var history []indicators.DailyMarket
 	if s.marketStore != nil {
@@ -313,6 +340,13 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 			_, _ = s.alerts.MaybeSendAdvanceDecline(ctx, snap.AdvanceDecline.Average10Day, snap.AdvanceDecline.AlertState)
 		}
 	}
+
+	if s.symbolStore != nil {
+		if _, symRows, err := s.symbolStore.LatestSymbolSnapshot(ctx); err == nil {
+			snap.SymbolRows = symRows
+		}
+	}
+
 	return snap, nil
 }
 

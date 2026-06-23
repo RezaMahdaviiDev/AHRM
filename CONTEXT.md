@@ -114,8 +114,9 @@ _Avoid_: writing it as plain "R" without "Bull Spread" context; sود/ریسک a
 
 **Daily Market Stats**:
 For one trading day, the count of traded symbols that closed Positive, Negative, or in
-total, across the **Stock Universe** only (see below). Recorded only after 18:00 Tehran
-time so the snapshot reflects final end-of-day prices, not intra-day data.
+total, across the **Stock Universe** only (see below). Recorded only after 13:00 Tehran
+time. A per-symbol snapshot (name, change %, status) is also persisted at the same time
+and displayed as the Symbol Detail table on the `/market` page.
 
 **Stock Universe**:
 The set of symbols included in breadth calculations: all symbols from the SourceArena

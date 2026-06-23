@@ -1,0 +1,58 @@
+{{define "content"}}
+<h1 style="font-family:Tahoma;direction:rtl">صف خرید سرخطی فردا</h1>
+<p style="font-family:Tahoma;direction:rtl;color:#888;margin-top:-8px;font-size:13px">
+  نمادهایی که امروز در سقف قیمتی یا صف خرید قوی بوده‌اند — احتمال سرخطی فردا بالاست.
+</p>
+
+{{if .Snapshot.QueueCandidates}}
+<div style="margin-top:16px">
+  <h3 style="font-family:Tahoma;direction:rtl;color:#ccc;margin-bottom:8px">
+    کاندیداهای سرخطی ({{len .Snapshot.QueueCandidates}} نماد)
+  </h3>
+  <div style="max-height:620px;overflow-y:auto;border:1px solid #1e2a3a;border-radius:4px">
+    <table style="width:100%;border-collapse:collapse;font-family:Tahoma;direction:rtl;font-size:13px">
+      <thead>
+        <tr style="background:#1a2535;color:#aaa;position:sticky;top:0;z-index:1">
+          <th style="padding:7px 10px;text-align:right">نماد</th>
+          <th style="padding:7px 10px;text-align:right">بازار</th>
+          <th style="padding:7px 10px;text-align:center">تغییر ٪</th>
+          <th style="padding:7px 10px;text-align:center">حجم صف خرید</th>
+          <th style="padding:7px 10px;text-align:center">وضعیت</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Snapshot.QueueCandidates}}
+        <tr style="border-bottom:1px solid #1a2535;background:rgba(0,200,100,0.07)">
+          <td style="padding:5px 10px;color:#e0e0e0;font-weight:bold">{{.Name}}</td>
+          <td style="padding:5px 10px;color:#aaa;font-size:12px">{{.Market}}</td>
+          <td style="padding:5px 10px;text-align:center;color:#4caf50;font-weight:bold">
+            +{{printf "%.2f" .ChangePct}}٪
+          </td>
+          <td style="padding:5px 10px;text-align:center;color:#aaa">
+            {{if gt .BuyVolume 0.0}}{{printf "%.0f" .BuyVolume}}{{else}}—{{end}}
+          </td>
+          <td style="padding:5px 10px;text-align:center">
+            {{if .IsIPO}}
+              <span style="background:#c62828;color:#fff;padding:2px 7px;border-radius:3px;font-size:12px">عرضه اولیه</span>
+            {{else if ge .Score 2}}
+              <span style="background:#e65100;color:#fff;padding:2px 7px;border-radius:3px;font-size:12px">سقف قیمتی</span>
+            {{else}}
+              <span style="background:#1565c0;color:#fff;padding:2px 7px;border-radius:3px;font-size:12px">صف خرید</span>
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{else}}
+<div style="font-family:Tahoma;direction:rtl;color:#888;margin-top:24px;padding:20px;border:1px solid #1e2a3a;border-radius:4px;text-align:center">
+  در حال حاضر کاندیدایی یافت نشد. داده‌ها هر {{.RefreshMinutes}} دقیقه یک‌بار به‌روز می‌شوند.
+</div>
+{{end}}
+
+<div style="font-family:Tahoma;direction:rtl;color:#555;font-size:11px;margin-top:16px">
+  معیار: تغییر ≥ ۴.۹٪ (سقف قیمتی روزانه TSE) — برای خرید سرخطی، سفارش را در ۸:۴۵ قبل از باز شدن بازار ثبت کنید.
+</div>
+{{end}}

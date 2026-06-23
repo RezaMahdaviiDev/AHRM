@@ -12,4 +12,70 @@
   <p>10-day Avg: {{printf "%.4f" .Snapshot.AdvanceDecline.Average10Day}}</p>
   <p>Alert: <span class="alert-{{.Snapshot.AdvanceDecline.AlertState}}">{{.Snapshot.AdvanceDecline.AlertState}}</span></p>
 </div>
+
+{{if .Snapshot.DailyHistory}}
+<div style="margin-top:24px">
+  <h3 style="font-family:Tahoma;direction:rtl;color:#ccc;margin-bottom:8px">تاریخچه روزانه</h3>
+  <table style="width:100%;border-collapse:collapse;font-family:Tahoma;direction:rtl;font-size:13px">
+    <thead>
+      <tr style="background:#1e2a3a;color:#aaa">
+        <th style="padding:7px 10px;text-align:right">تاریخ</th>
+        <th style="padding:7px 10px;text-align:center">مثبت</th>
+        <th style="padding:7px 10px;text-align:center">منفی</th>
+        <th style="padding:7px 10px;text-align:center">کل</th>
+        <th style="padding:7px 10px;text-align:center">٪ مثبت</th>
+        <th style="padding:7px 10px;text-align:center">وضعیت</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Snapshot.DailyHistory}}
+      <tr style="border-bottom:1px solid #1e2a3a;{{if .InWindow}}background:rgba(100,180,255,0.06){{end}}">
+        <td style="padding:6px 10px;color:#ccc;direction:ltr">{{toJalali .Date}}</td>
+        <td style="padding:6px 10px;text-align:center;color:#4caf50">{{.Positive}}</td>
+        <td style="padding:6px 10px;text-align:center;color:#f44336">{{.Negative}}</td>
+        <td style="padding:6px 10px;text-align:center;color:#aaa">{{.Total}}</td>
+        <td style="padding:6px 10px;text-align:center;color:#e0e0e0">{{printf "%.1f" .PctPositive}}٪</td>
+        <td style="padding:6px 10px;text-align:center">
+          {{if gt .PctPositive 55.0}}<span style="color:#4caf50">▲ صعودی</span>
+          {{else if lt .PctPositive 45.0}}<span style="color:#f44336">▼ نزولی</span>
+          {{else}}<span style="color:#888">— خنثی</span>{{end}}
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{if .Snapshot.SymbolRows}}
+<div style="margin-top:32px">
+  <h3 style="font-family:Tahoma;direction:rtl;color:#ccc;margin-bottom:8px">
+    نمادهای روز ({{len .Snapshot.SymbolRows}} نماد)
+  </h3>
+  <div style="max-height:520px;overflow-y:auto;border:1px solid #1e2a3a;border-radius:4px">
+    <table style="width:100%;border-collapse:collapse;font-family:Tahoma;direction:rtl;font-size:13px">
+      <thead>
+        <tr style="background:#1a2535;color:#aaa;position:sticky;top:0;z-index:1">
+          <th style="padding:7px 10px;text-align:right">نماد</th>
+          <th style="padding:7px 10px;text-align:center">تغییر ٪</th>
+          <th style="padding:7px 10px;text-align:center">وضعیت</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Snapshot.SymbolRows}}
+        <tr style="border-bottom:1px solid #1a2535;{{if eq .Status "positive"}}background:rgba(0,200,100,0.07){{else if eq .Status "negative"}}background:rgba(220,60,60,0.07){{end}}">
+          <td style="padding:5px 10px;color:#e0e0e0">{{.Name}}</td>
+          <td style="padding:5px 10px;text-align:center;{{if eq .Status "positive"}}color:#4caf50{{else if eq .Status "negative"}}color:#f44336{{else}}color:#888{{end}}">
+            {{printf "%.2f" .ChangePct}}٪
+          </td>
+          <td style="padding:5px 10px;text-align:center;font-size:15px">
+            {{if eq .Status "positive"}}▲{{else if eq .Status "negative"}}▼{{else}}–{{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
 {{end}}

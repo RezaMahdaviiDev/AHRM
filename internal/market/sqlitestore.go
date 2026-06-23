@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"ahrm/internal/indicators"
@@ -30,6 +31,25 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 		positive INTEGER NOT NULL DEFAULT 0,
 		negative INTEGER NOT NULL DEFAULT 0,
 		total    INTEGER NOT NULL DEFAULT 0
+	)`)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS market_symbol_snapshot (
+		snapshot_date TEXT NOT NULL,
+		name          TEXT NOT NULL,
+		change_pct    REAL NOT NULL,
+		status        TEXT NOT NULL,
+		PRIMARY KEY (snapshot_date, name)
+	)`)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS symbol_registry (
+		name            TEXT PRIMARY KEY,
+		first_seen_date TEXT NOT NULL
 	)`)
 	if err != nil {
 		db.Close()
@@ -115,6 +135,110 @@ func (s *SQLiteStore) ExistingDays(ctx context.Context, from, to time.Time) (map
 		out[d] = struct{}{}
 	}
 	return out, rows.Err()
+}
+
+func (s *SQLiteStore) UpsertSymbolSnapshot(ctx context.Context, date string, rows []indicators.SymbolRow) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	if _, err = tx.ExecContext(ctx, `DELETE FROM market_symbol_snapshot WHERE snapshot_date = ?`, date); err != nil {
+		return err
+	}
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO market_symbol_snapshot (snapshot_date, name, change_pct, status) VALUES (?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, r := range rows {
+		if _, err = stmt.ExecContext(ctx, date, r.Name, r.ChangePct, r.Status); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *SQLiteStore) LatestSymbolSnapshot(ctx context.Context) (date string, rows []indicators.SymbolRow, err error) {
+	err = s.db.QueryRowContext(ctx, `SELECT snapshot_date FROM market_symbol_snapshot ORDER BY snapshot_date DESC LIMIT 1`).Scan(&date)
+	if err != nil {
+		return "", nil, err
+	}
+	qrows, err := s.db.QueryContext(ctx, `SELECT name, change_pct, status FROM market_symbol_snapshot WHERE snapshot_date = ? ORDER BY change_pct DESC`, date)
+	if err != nil {
+		return date, nil, err
+	}
+	defer qrows.Close()
+	for qrows.Next() {
+		var r indicators.SymbolRow
+		if err = qrows.Scan(&r.Name, &r.ChangePct, &r.Status); err != nil {
+			return date, nil, err
+		}
+		rows = append(rows, r)
+	}
+	return date, rows, qrows.Err()
+}
+
+// RegisterSymbols inserts symbols into the registry and returns names that are new (first-ever appearance).
+// On the very first call (empty registry), returns nil so the entire symbol universe isn't flagged as IPOs.
+func (s *SQLiteStore) RegisterSymbols(ctx context.Context, names []string) ([]string, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	today := time.Now().UTC().Format("2006-01-02")
+
+	// First-run guard: if registry is empty, seed it silently.
+	var count int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM symbol_registry`).Scan(&count); err != nil {
+		return nil, err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	stmt, err := tx.PrepareContext(ctx, `INSERT OR IGNORE INTO symbol_registry (name, first_seen_date) VALUES (?, ?)`)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	for _, n := range names {
+		if _, err = stmt.ExecContext(ctx, n, today); err != nil {
+			return nil, err
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return nil, nil // first run: don't flag everything as IPO
+	}
+
+	// Find which names were newly inserted by querying what didn't exist before.
+	// Build IN clause for the batch.
+	placeholders := make([]string, len(names))
+	args := make([]any, len(names))
+	for i, n := range names {
+		placeholders[i] = "?"
+		args[i] = n
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT name FROM symbol_registry WHERE name IN (`+strings.Join(placeholders, ",")+`) AND first_seen_date = ?`,
+		append(args, today)...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var newNames []string
+	for rows.Next() {
+		var n string
+		if err = rows.Scan(&n); err != nil {
+			return nil, err
+		}
+		newNames = append(newNames, n)
+	}
+	return newNames, rows.Err()
 }
 
 func (s *SQLiteStore) Close() error {

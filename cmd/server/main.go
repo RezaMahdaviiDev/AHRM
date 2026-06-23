@@ -84,6 +84,8 @@ func main() {
 	}, tgSender, baleSender, alerts.NewStore(pool))
 
 	var mStore market.DailyStore
+	var symStore market.SymbolSnapshotStore
+	var regStore market.SymbolRegistryStore
 	if pool != nil {
 		mStore = market.NewStore(pool)
 	} else {
@@ -93,8 +95,10 @@ func main() {
 			os.Exit(1)
 		}
 		mStore = sqliteStore
+		symStore = sqliteStore
+		regStore = sqliteStore
 	}
-	scan := scanner.NewService(cfg, saClient, mStore, alertEngine)
+	scan := scanner.NewService(cfg, saClient, mStore, symStore, regStore, alertEngine)
 
 	dbReady := pool != nil
 	srv := server.New(cfg, pool, logger, filepath.Join(projectRoot(), "migrations"), dbReady, scan)

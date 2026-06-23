@@ -19,6 +19,19 @@ type DailyStore interface {
 	ExistingDays(ctx context.Context, from, to time.Time) (map[string]struct{}, error)
 }
 
+// SymbolSnapshotStore persists the filtered per-symbol daily snapshot recorded
+// at 13:00 Tehran time. Only SQLiteStore implements this; the Postgres Store does not.
+type SymbolSnapshotStore interface {
+	UpsertSymbolSnapshot(ctx context.Context, date string, rows []indicators.SymbolRow) error
+	LatestSymbolSnapshot(ctx context.Context) (date string, rows []indicators.SymbolRow, err error)
+}
+
+// SymbolRegistryStore tracks the first appearance of each symbol to detect IPOs.
+// Only SQLiteStore implements this.
+type SymbolRegistryStore interface {
+	RegisterSymbols(ctx context.Context, names []string) (newNames []string, err error)
+}
+
 type Store struct {
 	pool *pgxpool.Pool
 }

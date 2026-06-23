@@ -44,6 +44,12 @@ type symbolWire struct {
 	ClosePrice          flexFloat `json:"close_price"`
 	ClosePriceChangePct flexFloat `json:"close_price_change_percent"`
 	TradeValue          flexFloat `json:"trade_value"`
+	BuyRow1Price        flexFloat `json:"1_buy_price"`
+	BuyRow1Volume       flexFloat `json:"1_buy_volume"`
+	SellRow1Price       flexFloat `json:"1_sell_price"`
+	SellRow1Volume      flexFloat `json:"1_sell_volume"`
+	HighestPrice        flexFloat `json:"highest_price"`
+	LowestPrice         flexFloat `json:"lowest_price"`
 }
 
 type Option struct {
@@ -71,6 +77,12 @@ type SymbolQuote struct {
 	ClosePrice          float64 `json:"close_price"`
 	ClosePriceChangePct float64 `json:"close_price_change_percent"`
 	TradeValue          float64 `json:"trade_value"`
+	BuyRow1Price        float64 `json:"1_buy_price"`
+	BuyRow1Volume       float64 `json:"1_buy_volume"`
+	SellRow1Price       float64 `json:"1_sell_price"`
+	SellRow1Volume      float64 `json:"1_sell_volume"`
+	HighestPrice        float64 `json:"highest_price"`
+	LowestPrice         float64 `json:"lowest_price"`
 }
 
 type Candle struct {
@@ -201,6 +213,12 @@ func wiresToSymbols(wires []symbolWire) []SymbolQuote {
 			ClosePrice:          float64(w.ClosePrice),
 			ClosePriceChangePct: float64(w.ClosePriceChangePct),
 			TradeValue:          float64(w.TradeValue),
+			BuyRow1Price:        float64(w.BuyRow1Price),
+			BuyRow1Volume:       float64(w.BuyRow1Volume),
+			SellRow1Price:       float64(w.SellRow1Price),
+			SellRow1Volume:      float64(w.SellRow1Volume),
+			HighestPrice:        float64(w.HighestPrice),
+			LowestPrice:         float64(w.LowestPrice),
 		})
 	}
 	return out

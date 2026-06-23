@@ -11,6 +11,12 @@ type DailyMarket struct {
 	Total    int
 }
 
+type SymbolRow struct {
+	Name      string  `json:"name"`
+	ChangePct float64 `json:"change_pct"`
+	Status    string  `json:"status"` // "positive" | "negative" | "neutral"
+}
+
 type DailyValue struct {
 	Date  string  `json:"date"`
 	Value float64 `json:"value"`

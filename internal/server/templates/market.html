@@ -134,6 +134,48 @@
     </div>
     {{end}}
 
+    {{if .Snapshot.SymbolRows}}
+    <div class="card">
+      <h3>نمادهای روز
+        <span class="muted" style="font-size:0.8rem"> — {{len .Snapshot.SymbolRows}} نماد · مرتب‌شده بر اساس بیشترین تغییر</span>
+      </h3>
+      <div style="max-height:520px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+          <thead>
+            <tr style="border-bottom:2px solid #334155;color:#94a3b8;position:sticky;top:0;background:#1e293b;">
+              <th style="padding:0.4rem 0.6rem;text-align:right">نماد</th>
+              <th style="padding:0.4rem;text-align:center">تغییر ٪</th>
+              <th style="padding:0.4rem;text-align:center">وضعیت</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .Snapshot.SymbolRows}}
+            {{if eq .Status "positive"}}
+            <tr style="border-bottom:1px solid #14532d;background:#052e16;">
+              <td style="padding:0.35rem 0.6rem;color:#86efac">{{.Name}}</td>
+              <td style="padding:0.35rem;text-align:center;color:#86efac;font-weight:600">{{printf "%.2f" .ChangePct}}٪</td>
+              <td style="padding:0.35rem;text-align:center;color:#86efac">▲</td>
+            </tr>
+            {{else if eq .Status "negative"}}
+            <tr style="border-bottom:1px solid #450a0a;background:#2d0a0a;">
+              <td style="padding:0.35rem 0.6rem;color:#f87171">{{.Name}}</td>
+              <td style="padding:0.35rem;text-align:center;color:#f87171;font-weight:600">{{printf "%.2f" .ChangePct}}٪</td>
+              <td style="padding:0.35rem;text-align:center;color:#f87171">▼</td>
+            </tr>
+            {{else}}
+            <tr style="border-bottom:1px solid #1e293b;opacity:0.7;">
+              <td style="padding:0.35rem 0.6rem;color:#94a3b8">{{.Name}}</td>
+              <td style="padding:0.35rem;text-align:center;color:#94a3b8">{{printf "%.2f" .ChangePct}}٪</td>
+              <td style="padding:0.35rem;text-align:center;color:#94a3b8">–</td>
+            </tr>
+            {{end}}
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {{end}}
+
     {{if .Snapshot.Errors}}
     <div class="card">
       <h3>یادداشت</h3>
