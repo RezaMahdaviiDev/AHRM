@@ -38,3 +38,15 @@ func TestClassifyDayExcludesNonStockMarkets(t *testing.T) {
 		t.Fatalf("expected total=1 positive=1, got %+v", day)
 	}
 }
+
+func TestClassifyDayExcludesHaqTaqadom(t *testing.T) {
+	symbols := []sourcearena.SymbolQuote{
+		{Name: "فملی", Market: "بازار اول (تابلوی اصلی) بورس", ClosePriceChangePct: 1, TradeValue: 100},
+		{Name: "فملیح", Market: "-", ClosePriceChangePct: 1, TradeValue: 100}, // حق تقدم — excluded
+		{Name: "وبملح", Market: "-", ClosePriceChangePct: 2, TradeValue: 100}, // حق تقدم — excluded
+	}
+	day := market.ClassifyDay(symbols)
+	if day.Total != 1 || day.Positive != 1 {
+		t.Fatalf("expected total=1 (only فملی), got %+v", day)
+	}
+}

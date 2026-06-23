@@ -21,7 +21,7 @@ var excludedMarkets = map[string]struct{}{
 func ClassifyDay(symbols []sourcearena.SymbolQuote) indicators.DailyMarket {
 	var positive, negative, total int
 	for _, sym := range symbols {
-		if sym.TradeValue <= 0 || isOptionSymbol(sym.Name) {
+		if sym.TradeValue <= 0 || isOptionSymbol(sym.Name) || isHaqTaqadom(sym.Name) {
 			continue
 		}
 		if _, excluded := excludedMarkets[sym.Market]; excluded {

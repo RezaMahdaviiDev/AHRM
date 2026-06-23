@@ -71,7 +71,7 @@ func BackfillHistory(ctx context.Context, client *sourcearena.Client,
 
 	traded := make([]string, 0, len(symbols))
 	for _, s := range symbols {
-		if s.TradeValue <= 0 || isOptionSymbol(s.Name) {
+		if s.TradeValue <= 0 || isOptionSymbol(s.Name) || isHaqTaqadom(s.Name) {
 			continue
 		}
 		if _, excluded := excludedMarkets[s.Market]; excluded {
@@ -235,4 +235,11 @@ func isOptionSymbol(name string) bool {
 		}
 	}
 	return false
+}
+
+// isHaqTaqadom returns true for حق تقدم (preemptive rights) symbols.
+// By TSE convention these symbols end with the letter ح (e.g. وبملح, فملیح).
+func isHaqTaqadom(name string) bool {
+	runes := []rune(name)
+	return len(runes) >= 2 && runes[len(runes)-1] == 'ح'
 }
