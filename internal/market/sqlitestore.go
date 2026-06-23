@@ -55,6 +55,15 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 		db.Close()
 		return nil, err
 	}
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS queue_streak (
+		name      TEXT PRIMARY KEY,
+		streak    INTEGER NOT NULL DEFAULT 1,
+		last_date TEXT NOT NULL
+	)`)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &SQLiteStore{db: db}, nil
 }
 
@@ -177,6 +186,63 @@ func (s *SQLiteStore) LatestSymbolSnapshot(ctx context.Context) (date string, ro
 		rows = append(rows, r)
 	}
 	return date, rows, qrows.Err()
+}
+
+// UpsertQueueStreaks updates consecutive-day streaks for symbols currently in buy queue.
+// A streak continues when the symbol was last seen within 4 calendar days (covers Fri+Sat off).
+// Returns a map of name → streak count for all supplied names.
+func (s *SQLiteStore) UpsertQueueStreaks(ctx context.Context, names []string) (map[string]int, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	today := time.Now().UTC().Format("2006-01-02")
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO queue_streak (name, streak, last_date) VALUES (?, 1, ?)
+		ON CONFLICT(name) DO UPDATE SET
+			streak    = CASE WHEN julianday(?) - julianday(last_date) <= 4 THEN streak + 1 ELSE 1 END,
+			last_date = ?`)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	for _, n := range names {
+		if _, err = stmt.ExecContext(ctx, n, today, today, today); err != nil {
+			return nil, err
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	placeholders := make([]string, len(names))
+	args := make([]any, len(names))
+	for i, n := range names {
+		placeholders[i] = "?"
+		args[i] = n
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT name, streak FROM queue_streak WHERE name IN (`+strings.Join(placeholders, ",")+`)`,
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[string]int, len(names))
+	for rows.Next() {
+		var n string
+		var streak int
+		if err = rows.Scan(&n, &streak); err != nil {
+			return nil, err
+		}
+		out[n] = streak
+	}
+	return out, rows.Err()
 }
 
 // RegisterSymbols inserts symbols into the registry and returns names that are new (first-ever appearance).

@@ -26,10 +26,11 @@ type SymbolSnapshotStore interface {
 	LatestSymbolSnapshot(ctx context.Context) (date string, rows []indicators.SymbolRow, err error)
 }
 
-// SymbolRegistryStore tracks the first appearance of each symbol to detect IPOs.
-// Only SQLiteStore implements this.
+// SymbolRegistryStore tracks symbol lifecycle: first appearance (IPO detection) and
+// consecutive-day buy-queue streaks. Only SQLiteStore implements this.
 type SymbolRegistryStore interface {
 	RegisterSymbols(ctx context.Context, names []string) (newNames []string, err error)
+	UpsertQueueStreaks(ctx context.Context, names []string) (streaks map[string]int, err error)
 }
 
 type Store struct {

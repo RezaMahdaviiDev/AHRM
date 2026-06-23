@@ -43,6 +43,8 @@ type symbolWire struct {
 	Market              string    `json:"market"`
 	ClosePrice          flexFloat `json:"close_price"`
 	ClosePriceChangePct flexFloat `json:"close_price_change_percent"`
+	FinalPrice          flexFloat `json:"final_price"`
+	FinalPriceChangePct flexFloat `json:"final_price_change_percent"`
 	TradeValue          flexFloat `json:"trade_value"`
 	BuyRow1Price        flexFloat `json:"1_buy_price"`
 	BuyRow1Volume       flexFloat `json:"1_buy_volume"`
@@ -76,6 +78,8 @@ type SymbolQuote struct {
 	Market              string  `json:"market"`
 	ClosePrice          float64 `json:"close_price"`
 	ClosePriceChangePct float64 `json:"close_price_change_percent"`
+	FinalPrice          float64 `json:"final_price"`
+	FinalPriceChangePct float64 `json:"final_price_change_percent"`
 	TradeValue          float64 `json:"trade_value"`
 	BuyRow1Price        float64 `json:"1_buy_price"`
 	BuyRow1Volume       float64 `json:"1_buy_volume"`
@@ -212,6 +216,8 @@ func wiresToSymbols(wires []symbolWire) []SymbolQuote {
 			Market:              w.Market,
 			ClosePrice:          float64(w.ClosePrice),
 			ClosePriceChangePct: float64(w.ClosePriceChangePct),
+			FinalPrice:          float64(w.FinalPrice),
+			FinalPriceChangePct: float64(w.FinalPriceChangePct),
 			TradeValue:          float64(w.TradeValue),
 			BuyRow1Price:        float64(w.BuyRow1Price),
 			BuyRow1Volume:       float64(w.BuyRow1Volume),

@@ -152,19 +152,32 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 
 	// Scan for buy-queue (صف خرید) candidates suitable for سرخطی tomorrow.
 	if len(symbols) > 0 {
+		names := make([]string, 0, len(symbols))
+		for _, sym := range symbols {
+			names = append(names, sym.Name)
+		}
 		var newSyms []string
+		var streaks map[string]int
 		if s.registryStore != nil {
-			names := make([]string, 0, len(symbols))
-			for _, sym := range symbols {
-				names = append(names, sym.Name)
-			}
 			newSyms, _ = s.registryStore.RegisterSymbols(ctx, names)
 		}
 		newSymsSet := make(map[string]bool, len(newSyms))
 		for _, n := range newSyms {
 			newSymsSet[n] = true
 		}
-		snap.QueueCandidates = market.ScanQueue(symbols, newSymsSet)
+		candidates := market.ScanQueue(symbols, newSymsSet, nil)
+		// enrich with streak data after we know which symbols qualified
+		if s.registryStore != nil && len(candidates) > 0 {
+			queueNames := make([]string, len(candidates))
+			for i, c := range candidates {
+				queueNames[i] = c.Name
+			}
+			streaks, _ = s.registryStore.UpsertQueueStreaks(ctx, queueNames)
+			for i := range candidates {
+				candidates[i].StreakDays = streaks[candidates[i].Name]
+			}
+		}
+		snap.QueueCandidates = candidates
 	}
 
 	// Record today's breadth snapshot after 13:00 Tehran time (post-session data).

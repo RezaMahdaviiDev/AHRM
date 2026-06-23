@@ -31,9 +31,9 @@ func ClassifyDay(symbols []sourcearena.SymbolQuote) indicators.DailyMarket {
 		}
 		total++
 		switch {
-		case sym.ClosePriceChangePct > 0.5:
+		case sym.FinalPriceChangePct > 0.5:
 			positive++
-		case sym.ClosePriceChangePct < -0.5:
+		case sym.FinalPriceChangePct < -0.5:
 			negative++
 		}
 	}
@@ -58,14 +58,14 @@ func SymbolRows(symbols []sourcearena.SymbolQuote) []indicators.SymbolRow {
 		}
 		status := "neutral"
 		switch {
-		case sym.ClosePriceChangePct > 0.5:
+		case sym.FinalPriceChangePct > 0.5:
 			status = "positive"
-		case sym.ClosePriceChangePct < -0.5:
+		case sym.FinalPriceChangePct < -0.5:
 			status = "negative"
 		}
 		out = append(out, indicators.SymbolRow{
 			Name:      sym.Name,
-			ChangePct: sym.ClosePriceChangePct,
+			ChangePct: sym.FinalPriceChangePct,
 			Status:    status,
 		})
 	}
