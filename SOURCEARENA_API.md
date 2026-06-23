@@ -96,6 +96,23 @@ curl.exe -s -H "X-Header-Token:$token" "https://api3.sourcearena.ir/api/v2/candl
 
 **آخرین بروزرسانی:** بر اساس تست موفق در ۲۰۲۶/۰۶/۱۱ — هر دو API (market و candle) با موفقیت کار می‌کنند و صفحات `/hv` و `/arbitrage` بدون خطا لود می‌شوند.
 
+---
+
+## نکته مهم: تمایز قیمت پایانی و آخرین معامله
+
+در پاسخ endpoint `/?all&type=2` (و `/?name=<نماد>`) دو دسته فیلد قیمت وجود دارد:
+
+| فیلد JSON | معادل فارسی | استفاده در AHRM |
+|---|---|---|
+| `close_price` / `close_price_change_percent` | قیمت **آخرین معامله** | برای محاسبات breadth **استفاده نمی‌شود** |
+| `final_price` / `final_price_change_percent` | قیمت **پایانی** (weighted average) | مبنای طبقه‌بندی سهام مثبت/منفی/خنثی |
+
+**تأیید با داده واقعی (بکابل، ۱۴۰۵/۰۴/۰۲):**
+- `close_price_change_percent` = +2.97% (آخرین معامله)
+- `final_price_change_percent` = −0.64% (قیمت پایانی رسمی بورس)
+
+کد طبقه‌بندی در `internal/market/classify.go` از `FinalPriceChangePct` (نه `ClosePriceChangePct`) استفاده می‌کند.
+
 
 
 
