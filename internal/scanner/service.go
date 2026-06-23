@@ -384,14 +384,13 @@ func (s *Service) runBackfill(ctx context.Context) {
 	if s.client == nil || s.marketStore == nil {
 		return
 	}
-	// Mark backfilling early so the very first snapshot shows the banner.
-	s.backfilling.Store(true)
-	defer s.backfilling.Store(false)
-	// Skip the per-symbol candle backfill when SQL already covers the recent
-	// indicator window; on a store error NeedsBackfill returns true (fail-safe).
+	// Only set the flag when we actually need to backfill — prevents the banner
+	// from appearing on normal restarts where data is already sufficient.
 	if need, _ := market.NeedsBackfill(ctx, s.marketStore); !need {
 		return
 	}
+	s.backfilling.Store(true)
+	defer s.backfilling.Store(false)
 
 	bfCtx, cancel := context.WithTimeout(ctx, 60*time.Minute)
 	defer cancel()
