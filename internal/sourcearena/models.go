@@ -40,6 +40,7 @@ type optionWire struct {
 
 type symbolWire struct {
 	Name                string    `json:"name"`
+	Market              string    `json:"market"`
 	ClosePrice          flexFloat `json:"close_price"`
 	ClosePriceChangePct flexFloat `json:"close_price_change_percent"`
 	TradeValue          flexFloat `json:"trade_value"`
@@ -66,6 +67,7 @@ type Option struct {
 
 type SymbolQuote struct {
 	Name                string  `json:"name"`
+	Market              string  `json:"market"`
 	ClosePrice          float64 `json:"close_price"`
 	ClosePriceChangePct float64 `json:"close_price_change_percent"`
 	TradeValue          float64 `json:"trade_value"`
@@ -195,6 +197,7 @@ func wiresToSymbols(wires []symbolWire) []SymbolQuote {
 	for _, w := range wires {
 		out = append(out, SymbolQuote{
 			Name:                w.Name,
+			Market:              w.Market,
 			ClosePrice:          float64(w.ClosePrice),
 			ClosePriceChangePct: float64(w.ClosePriceChangePct),
 			TradeValue:          float64(w.TradeValue),

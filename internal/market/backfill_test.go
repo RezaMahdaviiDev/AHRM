@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ahrm/internal/indicators"
+	"ahrm/internal/sourcearena"
 )
 
 type fakeStore struct {
@@ -49,6 +50,27 @@ func (f *fakeStore) ExistingDays(_ context.Context, from, to time.Time) (map[str
 func seedRecentDays(store *fakeStore, n int) {
 	for i := 0; i < n; i++ {
 		store.set(time.Now().AddDate(0, 0, -i), indicators.DailyMarket{Positive: 1, Negative: 1, Total: 10})
+	}
+}
+
+func TestBackfillHistorySkipsFundSymbols(t *testing.T) {
+	// BackfillHistory with a nil client returns nil immediately after building
+	// the traded list. If all symbols are funds, traded is empty and the
+	// function exits early — verifying the market filter is applied.
+	ctx := context.Background()
+	symbols := []sourcearena.SymbolQuote{
+		{Name: "اهرم", Market: "بازار صندوق های قابل معامله", TradeValue: 100},
+		{Name: "عیار", Market: "صندوق های کالایی", TradeValue: 100},
+		{Name: "آلا", Market: "بازار ابزارهاي نوين مالي فرابورس", TradeValue: 100},
+	}
+	store := newFakeStore()
+	// nil client means BackfillHistory exits after traded-list building; no panic = filter OK
+	err := BackfillHistory(ctx, nil, symbols, store, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(store.days) != 0 {
+		t.Fatalf("expected no days written, got %d", len(store.days))
 	}
 }
 

@@ -21,3 +21,20 @@ func TestClassifyDay(t *testing.T) {
 		t.Fatalf("day=%+v", day)
 	}
 }
+
+func TestClassifyDayExcludesNonStockMarkets(t *testing.T) {
+	symbols := []sourcearena.SymbolQuote{
+		{Name: "فملی", Market: "بازار اول (تابلوی اصلی) بورس", ClosePriceChangePct: 1, TradeValue: 100},
+		{Name: "اهرم", Market: "بازار صندوق های قابل معامله", ClosePriceChangePct: 2, TradeValue: 100},
+		{Name: "عیار", Market: "صندوق های کالایی", ClosePriceChangePct: -1, TradeValue: 100},
+		{Name: "آلا", Market: "بازار ابزارهاي نوين مالي فرابورس", ClosePriceChangePct: 1, TradeValue: 100},
+		{Name: "رشد", Market: "بازار نوآفرین - رشد", ClosePriceChangePct: 1, TradeValue: 100},
+		{Name: "دانش", Market: "بازار نوآفرین - دانش بنیان", ClosePriceChangePct: 1, TradeValue: 100},
+		{Name: "کالا", Market: "بورس کالا", ClosePriceChangePct: 1, TradeValue: 100},
+	}
+	day := market.ClassifyDay(symbols)
+	// only فملی passes; all ETF/fund/non-stock markets excluded
+	if day.Total != 1 || day.Positive != 1 {
+		t.Fatalf("expected total=1 positive=1, got %+v", day)
+	}
+}

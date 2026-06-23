@@ -144,7 +144,9 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		snap.Underlying = underlying
 	}
 
-	if s.marketStore != nil && len(symbols) > 0 {
+	// Only record today's breadth snapshot after market close (18:00 Tehran time).
+	// Intra-day snapshots use incomplete data and would corrupt the historical record.
+	if isTehranAfter(18, 0) && s.marketStore != nil && len(symbols) > 0 {
 		today := market.ClassifyDay(symbols)
 		_ = s.marketStore.UpsertToday(ctx, today)
 	}
@@ -374,4 +376,13 @@ func nextTehranTime(hour, minute int) time.Time {
 		next = next.Add(24 * time.Hour)
 	}
 	return next
+}
+
+func isTehranAfter(hour, minute int) bool {
+	loc, err := time.LoadLocation("Asia/Tehran")
+	if err != nil {
+		loc = time.FixedZone("IRST", 3*3600+30*60)
+	}
+	now := time.Now().In(loc)
+	return now.Hour() > hour || (now.Hour() == hour && now.Minute() >= minute)
 }

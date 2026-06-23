@@ -114,8 +114,17 @@ _Avoid_: writing it as plain "R" without "Bull Spread" context; sود/ریسک a
 
 **Daily Market Stats**:
 For one trading day, the count of traded symbols that closed Positive, Negative, or in
-total, across the traded **non-option** market (option contracts themselves are excluded
-from the universe, only their underlyings count).
+total, across the **Stock Universe** only (see below). Recorded only after 18:00 Tehran
+time so the snapshot reflects final end-of-day prices, not intra-day data.
+
+**Stock Universe**:
+The set of symbols included in breadth calculations: all symbols from the SourceArena
+`/api/?all` feed whose `market` field is NOT in the non-stock blocklist. The following
+`market` values are excluded — ETFs, commodity funds, and non-equity instruments:
+`بازار صندوق های قابل معامله`, `صندوق های قابل معامله`, `صندوق های کالایی`,
+`بازار ابزارهاي نوين مالي فرابورس`, `بازار نوآفرین - رشد`, `بازار نوآفرین - دانش بنیان`,
+`بورس کالا`. Option symbols (any name containing a digit) are also excluded.
+_Avoid_: "all traded symbols" — the universe is filtered; ~786 symbols, not ~1063
 _Avoid_: advancers/decliners (those are derived views, not the raw counts); including
 option symbols in the universe
 

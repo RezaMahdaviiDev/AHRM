@@ -71,9 +71,13 @@ func BackfillHistory(ctx context.Context, client *sourcearena.Client,
 
 	traded := make([]string, 0, len(symbols))
 	for _, s := range symbols {
-		if s.TradeValue > 0 && !isOptionSymbol(s.Name) {
-			traded = append(traded, s.Name)
+		if s.TradeValue <= 0 || isOptionSymbol(s.Name) {
+			continue
 		}
+		if _, excluded := excludedMarkets[s.Market]; excluded {
+			continue
+		}
+		traded = append(traded, s.Name)
 	}
 	if len(traded) == 0 || client == nil {
 		return nil
