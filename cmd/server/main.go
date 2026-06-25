@@ -17,7 +17,6 @@ import (
 	"ahrm/internal/alerts"
 	"ahrm/internal/bale"
 	"ahrm/internal/config"
-	"ahrm/internal/db"
 	"ahrm/internal/market"
 	"ahrm/internal/scanner"
 	"ahrm/internal/server"
@@ -36,49 +35,22 @@ func main() {
 	level := parseLogLevel(cfg.LogLevel)
 	logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 
-	ctx := context.Background()
-	pool, err := db.Connect(ctx, cfg)
-	if err != nil {
-		logger.Error("database connection failed", "error", err)
-		os.Exit(1)
-	}
-	if pool != nil {
-		defer pool.Close()
-		if err := db.Ping(ctx, pool); err != nil {
-			logger.Error("database ping failed", "error", err)
-			os.Exit(1)
-		}
-		migrationsDir := filepath.Join(projectRoot(), "migrations")
-		if err := db.Migrate(ctx, pool, migrationsDir); err != nil {
-			logger.Error("database migration failed", "error", err)
-			os.Exit(1)
-		}
-	}
-
-	var rawStore sourcearena.RawStore = sourcearena.NopRawStore{}
-	if pool != nil {
-		rawStore = sourcearena.NewPostgresRawStore(pool)
-	}
 	var saClient *sourcearena.Client
 	if cfg.SourceArena.Configured() {
-		saClient = sourcearena.NewClient(cfg.SourceArena, rawStore)
+		saClient = sourcearena.NewClient(cfg.SourceArena, sourcearena.NopRawStore{})
 	}
 
 	var baleSender alerts.MessageSender
 	if cfg.Bale.Configured() {
 		baleSender = bale.NewClient(cfg.Bale)
 	}
-	var alertStore alerts.AlertStore
-	if pool != nil {
-		alertStore = alerts.NewPostgresStore(pool)
-	} else {
-		sqliteAlertStore, sqliteAlertErr := alerts.NewSQLiteStore(filepath.Join(projectRoot(), "data", "alerts.db"))
-		if sqliteAlertErr != nil {
-			logger.Error("sqlite alert store init failed", "error", sqliteAlertErr)
-			os.Exit(1)
-		}
-		alertStore = sqliteAlertStore
+
+	alertStore, err := alerts.NewSQLiteStore(filepath.Join(projectRoot(), "data", "alerts.db"))
+	if err != nil {
+		logger.Error("alert store init failed", "error", err)
+		os.Exit(1)
 	}
+
 	alertEngine := alerts.NewEngine(alerts.Config{
 		ArbitrageRThreshold:     cfg.Alerts.ArbitrageRThreshold,
 		ArbitrageR12Threshold:   cfg.Alerts.ArbitrageR12Threshold,
@@ -89,25 +61,15 @@ func main() {
 		CoveredCallROIThreshold: cfg.Alerts.CoveredCallROIThreshold,
 	}, baleSender, alertStore)
 
-	var mStore market.DailyStore
-	var symStore market.SymbolSnapshotStore
-	var regStore market.SymbolRegistryStore
-	if pool != nil {
-		mStore = market.NewStore(pool)
-	} else {
-		sqliteStore, sqliteErr := market.NewSQLiteStore(filepath.Join(projectRoot(), "data", "market.db"))
-		if sqliteErr != nil {
-			logger.Error("sqlite store init failed", "error", sqliteErr)
-			os.Exit(1)
-		}
-		mStore = sqliteStore
-		symStore = sqliteStore
-		regStore = sqliteStore
+	sqliteStore, err := market.NewSQLiteStore(filepath.Join(projectRoot(), "data", "market.db"))
+	if err != nil {
+		logger.Error("market store init failed", "error", err)
+		os.Exit(1)
 	}
-	scan := scanner.NewService(cfg, saClient, mStore, symStore, regStore, alertEngine)
 
-	dbReady := pool != nil
-	srv := server.New(cfg, pool, logger, filepath.Join(projectRoot(), "migrations"), dbReady, scan)
+	scan := scanner.NewService(cfg, saClient, sqliteStore, sqliteStore, sqliteStore, alertEngine)
+
+	srv := server.New(cfg, logger, scan)
 
 	refreshCtx, stopRefresh := context.WithCancel(context.Background())
 	defer stopRefresh()

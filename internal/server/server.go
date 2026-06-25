@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"html/template"
 	"log/slog"
@@ -11,37 +10,29 @@ import (
 
 	"ahrm/internal/config"
 	"ahrm/internal/scanner"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Server struct {
-	cfg              *config.Config
-	pool             *pgxpool.Pool
-	logger           *slog.Logger
-	migrations       string
-	dbReady          bool
-	scanner          *scanner.Service
-	templates        *template.Template
-	tplOnce          sync.Once
-	snapMu           sync.RWMutex
-	snapCache        scanner.Snapshot
-	snapAt           time.Time
-	refreshInterval  time.Duration
-	refreshSeconds   int
+	cfg             *config.Config
+	logger          *slog.Logger
+	scanner         *scanner.Service
+	templates       *template.Template
+	tplOnce         sync.Once
+	snapMu          sync.RWMutex
+	snapCache       scanner.Snapshot
+	snapAt          time.Time
+	refreshInterval time.Duration
+	refreshSeconds  int
 }
 
-func New(cfg *config.Config, pool *pgxpool.Pool, logger *slog.Logger, migrationsDir string, dbReady bool, scan *scanner.Service) *Server {
+func New(cfg *config.Config, logger *slog.Logger, scan *scanner.Service) *Server {
 	secs := cfg.SnapshotRefreshSeconds
 	if secs <= 0 {
 		secs = 180
 	}
 	return &Server{
 		cfg:             cfg,
-		pool:            pool,
 		logger:          logger,
-		migrations:      migrationsDir,
-		dbReady:         dbReady,
 		scanner:         scan,
 		refreshInterval: time.Duration(secs) * time.Second,
 		refreshSeconds:  secs,
@@ -63,25 +54,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request) {
-	report := s.cfg.ReadinessReport(s.dbReady)
-	status := http.StatusOK
-
-	if s.pool != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		if err := s.pool.Ping(ctx); err != nil {
-			report.Supabase.Connected = false
-			status = http.StatusServiceUnavailable
-		} else {
-			report.Supabase.Connected = true
-		}
-	}
-
-	writeJSON(w, status, report)
+	report := s.cfg.ReadinessReport()
+	writeJSON(w, http.StatusOK, report)
 }
 
 func (s *Server) ReadinessReport() config.Readiness {
-	return s.cfg.ReadinessReport(s.dbReady)
+	return s.cfg.ReadinessReport()
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

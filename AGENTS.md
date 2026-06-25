@@ -53,15 +53,13 @@ Use the installed skills rather than reinventing the process:
 
 Standard commands live in the `Makefile` and `README.md` — prefer those.
 
-- `make run` — start the server on `:8080`. **No external services are required**: when
-  Supabase is not configured the scanner persists market history to `data/market.db` and
-  alert history to `data/alerts.db` (both SQLite). `/health` (liveness) and `/ready`
-  (readiness JSON) need no external
-  deps and are the quickest way to confirm the server is up.
+- `make run` — start the server on `:8080`. **No external services are required**: market
+  history is persisted to `data/market.db` and alert history to `data/alerts.db` (both
+  SQLite). `/health` (liveness) and `/ready` (readiness JSON) need no external deps and are
+  the quickest way to confirm the server is up.
 - `make test` / `make build` — unit tests and binary build. The suite is expected to be
   green; CI (`.github/workflows/ci.yml`) runs `go vet` + `go build` + `go test ./...` on
   every PR using the Go version in `go.mod`.
-- `make test-integration` — needs a configured PostgreSQL/Supabase, else self-skips.
 
 ## Cursor Cloud specific instructions
 

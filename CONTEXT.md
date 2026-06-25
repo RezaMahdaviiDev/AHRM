@@ -2,7 +2,7 @@
 
 Ubiquitous language for the AHRM options-arbitrage scanner: a Go service that watches
 the Iranian `اهرم` options chain, computes arbitrage / volatility / breadth signals, and
-sends Telegram and Bale alerts. This file is a **glossary only** — definitions of domain
+sends Bale alerts. This file is a **glossary only** — definitions of domain
 terms, not implementation. Read it before working in this repo; update it whenever a term
 is added, renamed, or sharpened.
 
@@ -166,10 +166,9 @@ _Avoid_: automatic matrix alerts — only configured rules fire
 **Alert**:
 A signal pushed to Bale messenger. All alert types — arbitrage R, stressed arbitrage
 (R12.5), covered-call Static ROI, breadth, advance/decline, and matrix alerts — are sent
-to Bale. Sent alerts are recorded in `alert_history` (PostgreSQL when Supabase is
-configured, otherwise `data/alerts.db` SQLite) to suppress duplicates within a 24-hour
-window.
-_Avoid_: Telegram (removed); assuming alerts are sent without persistence
+to Bale. Sent alerts are recorded in `alert_history` in `data/alerts.db` (SQLite) to
+suppress duplicates within a 24-hour window.
+_Avoid_: Telegram (removed); Supabase/PostgreSQL (removed); assuming alerts are sent without persistence
 
 **Dedup Key**:
 The per-alert identity used to suppress duplicate Alerts for the same event.

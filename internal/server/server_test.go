@@ -14,7 +14,7 @@ import (
 
 func TestHealthAlwaysOK(t *testing.T) {
 	cfg := &config.Config{}
-	srv := server.New(cfg, nil, slog.Default(), "migrations", false, nil)
+	srv := server.New(cfg, slog.Default(), nil)
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
 
@@ -36,9 +36,9 @@ func TestHealthAlwaysOK(t *testing.T) {
 	}
 }
 
-func TestReadyWithoutDatabase(t *testing.T) {
+func TestReadyAlwaysOK(t *testing.T) {
 	cfg := &config.Config{}
-	srv := server.New(cfg, nil, slog.Default(), "migrations", false, nil)
+	srv := server.New(cfg, slog.Default(), nil)
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	rec := httptest.NewRecorder()
 
@@ -54,16 +54,13 @@ func TestReadyWithoutDatabase(t *testing.T) {
 	if !report.ConfigLoaded {
 		t.Fatal("expected config_loaded true")
 	}
-	if report.Supabase.Configured {
-		t.Fatal("expected supabase not configured")
-	}
 }
 
 func TestReadyUsesReadinessReportFields(t *testing.T) {
 	cfg := &config.Config{
 		SourceArena: config.SourceArenaConfig{APIToken: "token"},
 	}
-	srv := server.New(cfg, nil, slog.Default(), "migrations", false, nil)
+	srv := server.New(cfg, slog.Default(), nil)
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	rec := httptest.NewRecorder()
 

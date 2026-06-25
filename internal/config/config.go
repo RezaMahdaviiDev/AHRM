@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,7 +15,6 @@ type Config struct {
 	MatrixAlertsFile string
 	RiskFreeRate           float64
 	SnapshotRefreshSeconds int
-	Supabase               SupabaseConfig
 	SourceArena            SourceArenaConfig
 	Bale                   BaleConfig
 	Alerts                 AlertsConfig
@@ -32,16 +30,6 @@ type AlertsConfig struct {
 	CoveredCallROIThreshold float64
 }
 
-type SupabaseConfig struct {
-	Enabled  bool
-	Host     string
-	Port     string
-	Name     string
-	User     string
-	Password string
-	SSLMode  string
-}
-
 type SourceArenaConfig struct {
 	APIToken  string
 	HTTPProxy string
@@ -54,20 +42,11 @@ type BaleConfig struct {
 
 type ServiceStatus struct {
 	Configured bool `json:"configured"`
-	Connected  bool `json:"connected,omitempty"`
 }
 
 type Readiness struct {
 	ConfigLoaded bool          `json:"config_loaded"`
-	Supabase     ServiceStatus `json:"supabase"`
 	SourceArena  ServiceStatus `json:"sourcearena"`
-}
-
-func (s SupabaseConfig) Configured() bool {
-	if !s.Enabled {
-		return false
-	}
-	return anyNonEmpty(s.Host, s.Port, s.Name, s.User, s.Password, s.SSLMode)
 }
 
 func (s SourceArenaConfig) Configured() bool {
@@ -85,7 +64,7 @@ func Load() (*Config, error) {
 
 func loadEnvFiles() {
 	_ = godotenv.Load()
-	if os.Getenv("SUPABASE_DB_HOST") != "" {
+	if os.Getenv("HTTP_ADDR") != "" {
 		return
 	}
 	dir, err := os.Getwd()
@@ -116,15 +95,6 @@ func LoadFromEnv() (*Config, error) {
 		MatrixAlertsFile: getenv("MATRIX_ALERTS_FILE", "configs/matrix_alerts.json"),
 		RiskFreeRate:           parseFloatEnv("RISK_FREE_RATE", 0.20),
 		SnapshotRefreshSeconds: parseIntEnv("SNAPSHOT_REFRESH_SECONDS", 180),
-		Supabase: SupabaseConfig{
-			Enabled:  parseBoolEnv("SUPABASE_ENABLED", false),
-			Host:     strings.TrimSpace(os.Getenv("SUPABASE_DB_HOST")),
-			Port:     strings.TrimSpace(os.Getenv("SUPABASE_DB_PORT")),
-			Name:     strings.TrimSpace(os.Getenv("SUPABASE_DB_NAME")),
-			User:     strings.TrimSpace(os.Getenv("SUPABASE_DB_USER")),
-			Password: os.Getenv("SUPABASE_DB_PASSWORD"),
-			SSLMode:  strings.TrimSpace(os.Getenv("SUPABASE_DB_SSLMODE")),
-		},
 		SourceArena: SourceArenaConfig{
 			APIToken:  strings.TrimSpace(os.Getenv("SOURCEARENA_API_TOKEN")),
 			HTTPProxy: strings.TrimSpace(os.Getenv("SOURCEARENA_HTTP_PROXY")),
@@ -147,27 +117,12 @@ func LoadFromEnv() (*Config, error) {
 }
 
 func (c *Config) Validate() error {
-	if c.Supabase.Enabled {
-		if err := validateGroup("supabase", c.Supabase.Configured(), map[string]string{
-			"SUPABASE_DB_HOST":     c.Supabase.Host,
-			"SUPABASE_DB_PORT":     c.Supabase.Port,
-			"SUPABASE_DB_NAME":     c.Supabase.Name,
-			"SUPABASE_DB_USER":     c.Supabase.User,
-			"SUPABASE_DB_PASSWORD": c.Supabase.Password,
-			"SUPABASE_DB_SSLMODE":  c.Supabase.SSLMode,
-		}); err != nil {
-			return err
-		}
-	}
 	if err := validateGroup("sourcearena", c.SourceArena.Configured(), map[string]string{
 		"SOURCEARENA_API_TOKEN": c.SourceArena.APIToken,
 	}); err != nil {
 		return err
 	}
-	if err := c.validateBale(); err != nil {
-		return err
-	}
-	return nil
+	return c.validateBale()
 }
 
 func (c *Config) validateBale() error {
@@ -179,39 +134,11 @@ func (c *Config) validateBale() error {
 	return nil
 }
 
-func (c *Config) ReadinessReport(dbConnected bool) Readiness {
+func (c *Config) ReadinessReport() Readiness {
 	return Readiness{
 		ConfigLoaded: true,
-		Supabase: ServiceStatus{
-			Configured: c.Supabase.Configured(),
-			Connected:  c.Supabase.Configured() && dbConnected,
-		},
-		SourceArena: ServiceStatus{Configured: c.SourceArena.Configured()},
+		SourceArena:  ServiceStatus{Configured: c.SourceArena.Configured()},
 	}
-}
-
-func (c *Config) SupabaseDSN() (string, error) {
-	if !c.Supabase.Configured() {
-		return "", fmt.Errorf("supabase is not configured")
-	}
-	port := c.Supabase.Port
-	if port == "" {
-		port = "5432"
-	}
-	sslMode := c.Supabase.SSLMode
-	if sslMode == "" {
-		sslMode = "require"
-	}
-	u := &url.URL{
-		Scheme: "postgres",
-		User:   url.UserPassword(c.Supabase.User, c.Supabase.Password),
-		Host:   fmt.Sprintf("%s:%s", c.Supabase.Host, port),
-		Path:   c.Supabase.Name,
-	}
-	q := u.Query()
-	q.Set("sslmode", sslMode)
-	u.RawQuery = q.Encode()
-	return u.String(), nil
 }
 
 func validateGroup(name string, configured bool, fields map[string]string) error {
@@ -236,30 +163,6 @@ func getenv(key, fallback string) string {
 		return value
 	}
 	return fallback
-}
-
-func anyNonEmpty(values ...string) bool {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return true
-		}
-	}
-	return false
-}
-
-func parseBoolEnv(key string, fallback bool) bool {
-	raw := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
-	if raw == "" {
-		return fallback
-	}
-	switch raw {
-	case "1", "true", "yes", "on":
-		return true
-	case "0", "false", "no", "off":
-		return false
-	default:
-		return fallback
-	}
 }
 
 func parseFloatEnv(key string, fallback float64) float64 {

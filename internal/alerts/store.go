@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	_ "modernc.org/sqlite"
 )
 
@@ -20,38 +19,8 @@ type AlertStore interface {
 	Record(ctx context.Context, alertType, key string, payload []byte) error
 }
 
-// PostgresStore persists alert history in PostgreSQL (used when Supabase is configured).
-type PostgresStore struct {
-	pool *pgxpool.Pool
-}
-
-func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
-	return &PostgresStore{pool: pool}
-}
-
-func (s *PostgresStore) WasSent(ctx context.Context, alertType, key string) (bool, error) {
-	digest := hashKey(alertType + ":" + key)
-	var exists bool
-	err := s.pool.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM alert_history WHERE alert_type=$1 AND alert_key=$2)`,
-		alertType, digest,
-	).Scan(&exists)
-	return exists, err
-}
-
-func (s *PostgresStore) Record(ctx context.Context, alertType, key string, payload []byte) error {
-	digest := hashKey(alertType + ":" + key)
-	_, err := s.pool.Exec(ctx,
-		`INSERT INTO alert_history (alert_type, alert_key, payload, sent_at) VALUES ($1,$2,$3,$4)
-		 ON CONFLICT (alert_type, alert_key) DO NOTHING`,
-		alertType, digest, payload, time.Now().UTC(),
-	)
-	return err
-}
-
 // SQLiteStore persists alert history in a local SQLite file.
-// Used when PostgreSQL is not configured, so notifications survive server restarts.
-// Alerts older than 24 hours are pruned on startup so daily opportunities can re-trigger.
+// Alerts older than 24 hours are pruned on startup so daily opportunities re-trigger.
 type SQLiteStore struct {
 	db *sql.DB
 	mu sync.Mutex
@@ -109,8 +78,7 @@ func (s *SQLiteStore) Record(_ context.Context, alertType, key string, payload [
 	return err
 }
 
-// NewMemStore returns an in-memory AlertStore with no persistence.
-// Intended for tests only.
+// NewMemStore returns an in-memory AlertStore with no persistence. Intended for tests only.
 func NewMemStore() AlertStore {
 	s, _ := NewSQLiteStore(":memory:")
 	return s
