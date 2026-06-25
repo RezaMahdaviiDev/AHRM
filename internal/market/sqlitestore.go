@@ -64,6 +64,8 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 		db.Close()
 		return nil, err
 	}
+	// Remove any zero-total rows written during market holidays (Scenario B).
+	db.Exec(`DELETE FROM market_daily_stats WHERE total = 0`)
 	return &SQLiteStore{db: db}, nil
 }
 

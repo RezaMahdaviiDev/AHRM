@@ -119,6 +119,10 @@ time. A per-symbol snapshot (name, change %, status) is also persisted at the sa
 and displayed as the Symbol Detail table on the `/market` page. The price basis for
 classification is **قیمت پایانی** (weighted average closing price, `final_price_change_percent`
 in the SourceArena API) — not قیمت آخرین معامله (`close_price_change_percent`).
+On **market holidays**, SourceArena caches the last trading day's snapshot (with non-zero
+`TradeValue`). Recording is skipped whenever today's computed stats are identical to the
+most recent stored day — this is a reliable holiday signal because real consecutive trading
+days virtually never produce the exact same Positive/Negative/Total counts.
 
 **Stock Universe**:
 The set of symbols included in breadth calculations: all symbols from the SourceArena

@@ -180,22 +180,33 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		snap.QueueCandidates = candidates
 	}
 
-	// Record today's breadth snapshot after 13:00 Tehran time (post-session data).
-	if isTehranAfter(13, 0) && s.marketStore != nil && len(symbols) > 0 {
-		today := market.ClassifyDay(symbols)
-		_ = s.marketStore.UpsertToday(ctx, today)
-		if s.symbolStore != nil {
-			symRows := market.SymbolRows(symbols)
-			date := time.Now().UTC().Format("2006-01-02")
-			_ = s.symbolStore.UpsertSymbolSnapshot(ctx, date, symRows)
-		}
-	}
+	// Load history first — used for both the holiday guard below and indicator evaluation.
 	var history []indicators.DailyMarket
 	if s.marketStore != nil {
 		var histErr error
 		history, histErr = s.marketStore.LastDays(ctx, 30)
 		if histErr != nil {
 			snap.Errors = append(snap.Errors, fmt.Sprintf("market history: %v", histErr))
+		}
+	}
+
+	// Record today's breadth snapshot after 13:00 Tehran time (post-session data).
+	// Skip when Total==0 (market fully closed) or when stats exactly match the most-recent
+	// DB record — SourceArena caches the last trading day's snapshot on holidays, so
+	// identical stats is a reliable signal that no trading occurred today.
+	if isTehranAfter(13, 0) && s.marketStore != nil && len(symbols) > 0 {
+		today := market.ClassifyDay(symbols)
+		stale := today.Total > 0 && len(history) > 0 &&
+			history[len(history)-1].Positive == today.Positive &&
+			history[len(history)-1].Negative == today.Negative &&
+			history[len(history)-1].Total == today.Total
+		if today.Total > 0 && !stale {
+			_ = s.marketStore.UpsertToday(ctx, today)
+			if s.symbolStore != nil {
+				symRows := market.SymbolRows(symbols)
+				date := time.Now().UTC().Format("2006-01-02")
+				_ = s.symbolStore.UpsertSymbolSnapshot(ctx, date, symRows)
+			}
 		}
 	}
 	if len(history) > 0 {

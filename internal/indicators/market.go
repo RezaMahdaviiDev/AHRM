@@ -94,10 +94,10 @@ func NewBreadthEngine(th Thresholds) *BreadthEngine {
 func (e *BreadthEngine) Evaluate(history []DailyMarket) (IndicatorResult, error) {
 	values := make([]float64, 0, len(history))
 	for _, day := range history {
-		v, err := BreadthDailyValue(day)
-		if err != nil {
-			return IndicatorResult{}, err
+		if day.Total <= 0 {
+			continue
 		}
+		v, _ := BreadthDailyValue(day)
 		values = append(values, v)
 	}
 	if len(values) == 0 {
@@ -132,10 +132,10 @@ func NewAdvanceDeclineEngine(th Thresholds) *AdvanceDeclineEngine {
 func (e *AdvanceDeclineEngine) Evaluate(history []DailyMarket) (IndicatorResult, error) {
 	values := make([]float64, 0, len(history))
 	for _, day := range history {
-		v, err := AdvanceDeclineDailyValue(day)
-		if err != nil {
-			return IndicatorResult{}, err
+		if day.Total <= 0 {
+			continue
 		}
+		v, _ := AdvanceDeclineDailyValue(day)
 		values = append(values, v)
 	}
 	if len(values) == 0 {
