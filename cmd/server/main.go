@@ -22,7 +22,6 @@ import (
 	"ahrm/internal/scanner"
 	"ahrm/internal/server"
 	"ahrm/internal/sourcearena"
-	"ahrm/internal/telegram"
 )
 
 func main() {
@@ -65,13 +64,20 @@ func main() {
 		saClient = sourcearena.NewClient(cfg.SourceArena, rawStore)
 	}
 
-	var tgSender alerts.TelegramSender
-	if cfg.Telegram.Configured() {
-		tgSender = telegram.NewClient(cfg.Telegram)
-	}
-	var baleSender alerts.TelegramSender
+	var baleSender alerts.MessageSender
 	if cfg.Bale.Configured() {
 		baleSender = bale.NewClient(cfg.Bale)
+	}
+	var alertStore alerts.AlertStore
+	if pool != nil {
+		alertStore = alerts.NewPostgresStore(pool)
+	} else {
+		sqliteAlertStore, sqliteAlertErr := alerts.NewSQLiteStore(filepath.Join(projectRoot(), "data", "alerts.db"))
+		if sqliteAlertErr != nil {
+			logger.Error("sqlite alert store init failed", "error", sqliteAlertErr)
+			os.Exit(1)
+		}
+		alertStore = sqliteAlertStore
 	}
 	alertEngine := alerts.NewEngine(alerts.Config{
 		ArbitrageRThreshold:     cfg.Alerts.ArbitrageRThreshold,
@@ -81,7 +87,7 @@ func main() {
 		AdvanceHighThreshold:    cfg.Alerts.AdvanceHighThreshold,
 		AdvanceLowThreshold:     cfg.Alerts.AdvanceLowThreshold,
 		CoveredCallROIThreshold: cfg.Alerts.CoveredCallROIThreshold,
-	}, tgSender, baleSender, alerts.NewStore(pool))
+	}, baleSender, alertStore)
 
 	var mStore market.DailyStore
 	var symStore market.SymbolSnapshotStore

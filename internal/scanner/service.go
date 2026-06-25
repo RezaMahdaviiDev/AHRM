@@ -286,7 +286,7 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 				snap.CoveredCalls = covered
 				for _, cc := range covered {
 					if s.alerts != nil {
-						_, _ = s.alerts.MaybeSendCoveredCallROIBale(ctx, alerts.CoveredCallAlertInput{
+						_, _ = s.alerts.MaybeSendCoveredCallROI(ctx, alerts.CoveredCallAlertInput{
 							Symbol:       cc.Symbol,
 							Expiry:       cc.Expiry,
 							Strike:       cc.Strike,
@@ -309,7 +309,7 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 					_, _ = s.alerts.MaybeSendArbitrage(ctx, alerts.ArbitrageAlertInput{
 						Symbol: opp.Symbol, Expiry: opp.Expiry, Strike: opp.Strike, ReturnPct: opp.ReturnPct,
 					})
-					_, _ = s.alerts.MaybeSendArbitrageR12Bale(ctx, alerts.ArbitrageAlertInput{
+					_, _ = s.alerts.MaybeSendArbitrageR12(ctx, alerts.ArbitrageAlertInput{
 						Symbol: opp.Symbol, Expiry: opp.Expiry, Strike: opp.Strike, ReturnPct: opp.ReturnPct12_5,
 					})
 				}

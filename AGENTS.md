@@ -2,7 +2,7 @@
 
 Operating guidance for AI agents working on AHRM — a Go service that scans the Iranian
 `اهرم` options chain, computes arbitrage / volatility / breadth signals, and pushes
-Telegram + Bale alerts.
+Bale alerts.
 
 ## Living documentation lifecycle
 
@@ -54,8 +54,9 @@ Use the installed skills rather than reinventing the process:
 Standard commands live in the `Makefile` and `README.md` — prefer those.
 
 - `make run` — start the server on `:8080`. **No external services are required**: when
-  Supabase is not configured the scanner persists market history to a local SQLite file
-  (`data/market.db`). `/health` (liveness) and `/ready` (readiness JSON) need no external
+  Supabase is not configured the scanner persists market history to `data/market.db` and
+  alert history to `data/alerts.db` (both SQLite). `/health` (liveness) and `/ready`
+  (readiness JSON) need no external
   deps and are the quickest way to confirm the server is up.
 - `make test` / `make build` — unit tests and binary build. The suite is expected to be
   green; CI (`.github/workflows/ci.yml`) runs `go vet` + `go build` + `go test ./...` on

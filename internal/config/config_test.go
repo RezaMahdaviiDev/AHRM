@@ -16,8 +16,6 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("SUPABASE_DB_PASSWORD", "")
 	t.Setenv("SUPABASE_DB_SSLMODE", "")
 	t.Setenv("SOURCEARENA_API_TOKEN", "")
-	t.Setenv("TELEGRAM_BOT_TOKEN", "")
-	t.Setenv("TELEGRAM_CHAT_ID", "")
 	t.Setenv("RISK_FREE_RATE", "")
 
 	cfg, err := config.LoadFromEnv()
@@ -116,30 +114,6 @@ func TestReadinessReportUnconfigured(t *testing.T) {
 	}
 	if report.SourceArena.Configured {
 		t.Fatal("expected sourcearena not configured")
-	}
-	if report.Telegram.Configured {
-		t.Fatal("expected telegram not configured")
-	}
-}
-
-func TestValidateChatWithoutTokenFails(t *testing.T) {
-	cfg := &config.Config{
-		Telegram: config.TelegramConfig{ChatID: "123"},
-	}
-	if err := cfg.Validate(); err == nil {
-		t.Fatal("expected validation error when chat id set without token")
-	}
-}
-
-func TestValidateTokenWithoutChatOK(t *testing.T) {
-	cfg := &config.Config{
-		Telegram: config.TelegramConfig{BotToken: "token"},
-	}
-	if err := cfg.Validate(); err != nil {
-		t.Fatalf("Validate() error = %v", err)
-	}
-	if cfg.Telegram.Configured() {
-		t.Fatal("expected telegram not fully configured without chat id")
 	}
 }
 

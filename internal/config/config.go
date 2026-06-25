@@ -18,7 +18,6 @@ type Config struct {
 	SnapshotRefreshSeconds int
 	Supabase               SupabaseConfig
 	SourceArena            SourceArenaConfig
-	Telegram               TelegramConfig
 	Bale                   BaleConfig
 	Alerts                 AlertsConfig
 }
@@ -48,11 +47,6 @@ type SourceArenaConfig struct {
 	HTTPProxy string
 }
 
-type TelegramConfig struct {
-	BotToken string
-	ChatID   string
-}
-
 type BaleConfig struct {
 	BotToken string
 	ChatIDs  string // comma-separated list of chat IDs
@@ -67,7 +61,6 @@ type Readiness struct {
 	ConfigLoaded bool          `json:"config_loaded"`
 	Supabase     ServiceStatus `json:"supabase"`
 	SourceArena  ServiceStatus `json:"sourcearena"`
-	Telegram     ServiceStatus `json:"telegram"`
 }
 
 func (s SupabaseConfig) Configured() bool {
@@ -79,10 +72,6 @@ func (s SupabaseConfig) Configured() bool {
 
 func (s SourceArenaConfig) Configured() bool {
 	return strings.TrimSpace(s.APIToken) != ""
-}
-
-func (t TelegramConfig) Configured() bool {
-	return strings.TrimSpace(t.BotToken) != "" && strings.TrimSpace(t.ChatID) != ""
 }
 
 func (b BaleConfig) Configured() bool {
@@ -140,10 +129,6 @@ func LoadFromEnv() (*Config, error) {
 			APIToken:  strings.TrimSpace(os.Getenv("SOURCEARENA_API_TOKEN")),
 			HTTPProxy: strings.TrimSpace(os.Getenv("SOURCEARENA_HTTP_PROXY")),
 		},
-		Telegram: TelegramConfig{
-			BotToken: strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN")),
-			ChatID:   strings.TrimSpace(os.Getenv("TELEGRAM_CHAT_ID")),
-		},
 		Bale: BaleConfig{
 			BotToken: strings.TrimSpace(os.Getenv("BALE_BOT_TOKEN")),
 			ChatIDs:  strings.TrimSpace(os.Getenv("BALE_CHAT_IDS")),
@@ -179,20 +164,8 @@ func (c *Config) Validate() error {
 	}); err != nil {
 		return err
 	}
-	if err := c.validateTelegram(); err != nil {
-		return err
-	}
 	if err := c.validateBale(); err != nil {
 		return err
-	}
-	return nil
-}
-
-func (c *Config) validateTelegram() error {
-	hasToken := strings.TrimSpace(c.Telegram.BotToken) != ""
-	hasChat := strings.TrimSpace(c.Telegram.ChatID) != ""
-	if hasChat && !hasToken {
-		return fmt.Errorf("telegram: TELEGRAM_BOT_TOKEN is required when TELEGRAM_CHAT_ID is set")
 	}
 	return nil
 }
@@ -214,7 +187,6 @@ func (c *Config) ReadinessReport(dbConnected bool) Readiness {
 			Connected:  c.Supabase.Configured() && dbConnected,
 		},
 		SourceArena: ServiceStatus{Configured: c.SourceArena.Configured()},
-		Telegram:    ServiceStatus{Configured: c.Telegram.Configured()},
 	}
 }
 

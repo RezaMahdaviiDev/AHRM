@@ -164,10 +164,12 @@ symbols crosses a threshold.
 _Avoid_: automatic matrix alerts — only configured rules fire
 
 **Alert**:
-A signal pushed to an external messenger. Routing is split by type: Telegram carries
-arbitrage R, breadth, advance/decline, and matrix alerts; Bale carries the stressed
-arbitrage (R12.5) and covered-call Static ROI alerts.
-_Avoid_: assuming every alert goes to both messengers
+A signal pushed to Bale messenger. All alert types — arbitrage R, stressed arbitrage
+(R12.5), covered-call Static ROI, breadth, advance/decline, and matrix alerts — are sent
+to Bale. Sent alerts are recorded in `alert_history` (PostgreSQL when Supabase is
+configured, otherwise `data/alerts.db` SQLite) to suppress duplicates within a 24-hour
+window.
+_Avoid_: Telegram (removed); assuming alerts are sent without persistence
 
 **Dedup Key**:
 The per-alert identity used to suppress duplicate Alerts for the same event.
