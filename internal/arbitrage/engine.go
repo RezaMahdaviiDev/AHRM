@@ -31,6 +31,9 @@ func (e *Engine) Calculate(pair pairs.Pair, underlyingPrice float64) (Opportunit
 	if pair.Strike <= 0 {
 		return Opportunity{}, fmt.Errorf("strike must be positive")
 	}
+	if pair.Put.ClosePrice <= 1 {
+		return Opportunity{}, fmt.Errorf("put not traded (price=%.0f)", pair.Put.ClosePrice)
+	}
 	call := pair.Call.ClosePrice
 	put := pair.Put.ClosePrice
 	spread := call - put

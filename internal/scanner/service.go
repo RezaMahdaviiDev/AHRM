@@ -311,6 +311,13 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 			for _, msg := range ivErrs {
 				snap.Errors = append(snap.Errors, msg)
 			}
+			ivMap := make(map[string]float64, len(ivResults))
+			for _, iv := range ivResults {
+				ivMap[iv.Symbol] = iv.IVPct
+			}
+			for i := range snap.CoveredCalls {
+				snap.CoveredCalls[i].IV = ivMap[snap.CoveredCalls[i].Symbol]
+			}
 		}
 		if matched, pErr := s.pairEngine.Match(options); pErr == nil {
 			opps, _ := s.arbEngine.CalculateAll(matched, snap.Underlying.ClosePrice)
@@ -337,6 +344,20 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		if snap.Underlying.ClosePrice > 0 {
 			snap.BullSpreadsATM = s.bullSpreadEngine.CalculateAll(options, snap.Underlying.ClosePrice, bullspread.ATM)
 			snap.BullSpreadsOTM = s.bullSpreadEngine.CalculateAll(options, snap.Underlying.ClosePrice, bullspread.OTM)
+			if s.alerts != nil {
+				for _, sp := range snap.BullSpreadsATM {
+					_, _ = s.alerts.MaybeSendBullSpreadBale(ctx, alerts.BullSpreadAlertInput{
+						K1Symbol: sp.K1Symbol, K2Symbol: sp.K2Symbol,
+						Expiry: sp.Expiry, R: sp.R, Kind: "ATM",
+					})
+				}
+				for _, sp := range snap.BullSpreadsOTM {
+					_, _ = s.alerts.MaybeSendBullSpreadBale(ctx, alerts.BullSpreadAlertInput{
+						K1Symbol: sp.K1Symbol, K2Symbol: sp.K2Symbol,
+						Expiry: sp.Expiry, R: sp.R, Kind: "OTM",
+					})
+				}
+			}
 		}
 
 		prices := make(map[string]float64, len(options))

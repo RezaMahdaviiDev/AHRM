@@ -82,6 +82,7 @@
   </main>
   <script>
     (function () {
+      const SORT_KEY = 'ahrm-arb-sort';
       const tbody = document.getElementById('arb-body');
       const headers = document.querySelectorAll('#arb-table th.sortable');
       if (!tbody || headers.length === 0) return;
@@ -95,10 +96,7 @@
       function parseDate(s) {
         const parts = String(s).trim().split('/');
         if (parts.length !== 3) return 0;
-        const y = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10);
-        const d = parseInt(parts[2], 10);
-        return (y * 10000) + (m * 100) + d;
+        return (parseInt(parts[0], 10) * 10000) + (parseInt(parts[1], 10) * 100) + parseInt(parts[2], 10);
       }
 
       function cellValue(row, col, type) {
@@ -116,7 +114,7 @@
       }
 
       function updateIcons(th, dir) {
-        headers.forEach(h => {
+        headers.forEach(function(h) {
           h.classList.remove('active');
           const icon = h.querySelector('.sort-icon');
           if (icon) icon.textContent = '';
@@ -126,26 +124,37 @@
         if (icon) icon.textContent = dir === 'asc' ? '▲' : '▼';
       }
 
-      headers.forEach(th => {
+      function doSort(col, type, ascending) {
+        const sorted = rows.slice().sort(function(ra, rb) {
+          const va = cellValue(ra, col, type);
+          const vb = cellValue(rb, col, type);
+          const c = compare(va, vb, type);
+          return ascending ? c : -c;
+        });
+        sorted.forEach(function(r) { tbody.appendChild(r); });
+        updateIcons(headers[col], ascending ? 'asc' : 'desc');
+      }
+
+      headers.forEach(function(th) {
         th.addEventListener('click', function () {
           const col = parseInt(th.dataset.col, 10);
           const type = th.dataset.type || 'text';
-          if (activeCol === col) {
-            asc = !asc;
-          } else {
-            activeCol = col;
-            asc = true;
-          }
-          const sorted = rows.slice().sort((ra, rb) => {
-            const va = cellValue(ra, col, type);
-            const vb = cellValue(rb, col, type);
-            const c = compare(va, vb, type);
-            return asc ? c : -c;
-          });
-          sorted.forEach(r => tbody.appendChild(r));
-          updateIcons(th, asc ? 'asc' : 'desc');
+          if (activeCol === col) { asc = !asc; } else { activeCol = col; asc = true; }
+          doSort(col, type, asc);
+          localStorage.setItem(SORT_KEY, JSON.stringify({col: activeCol, asc: asc}));
         });
       });
+
+      // restore sort after page refresh
+      (function () {
+        try {
+          const s = JSON.parse(localStorage.getItem(SORT_KEY));
+          if (s && s.col != null && headers[s.col]) {
+            activeCol = s.col; asc = s.asc;
+            doSort(s.col, headers[s.col].dataset.type || 'text', s.asc);
+          }
+        } catch(e) {}
+      })();
     })();
   </script>
 </body>

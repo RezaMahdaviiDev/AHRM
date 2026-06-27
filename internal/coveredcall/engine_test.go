@@ -35,10 +35,10 @@ func TestCalculateAllFormulas(t *testing.T) {
 	if diff := cc.MaxROIPct - wantMax; diff > 0.0001 || diff < -0.0001 {
 		t.Fatalf("max_roi=%v want=%v", cc.MaxROIPct, wantMax)
 	}
-	// Break Even = S - C = NetCost
+	// NetCost = S - C (break-even, BreakEven field removed — verified via NetCost)
 	wantBreakEven := 25000.0 - 1500.0
-	if diff := cc.BreakEven - wantBreakEven; diff > 0.01 || diff < -0.01 {
-		t.Fatalf("break_even=%v want=%v", cc.BreakEven, wantBreakEven)
+	if diff := cc.NetCost - wantBreakEven; diff > 0.01 || diff < -0.01 {
+		t.Fatalf("net_cost=%v want=%v", cc.NetCost, wantBreakEven)
 	}
 }
 

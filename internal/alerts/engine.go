@@ -18,6 +18,8 @@ type Config struct {
 	AdvanceHighThreshold    float64
 	AdvanceLowThreshold     float64
 	CoveredCallROIThreshold float64
+	BullSpreadATMThreshold  float64
+	BullSpreadOTMThreshold  float64
 }
 
 type Engine struct {
@@ -85,6 +87,28 @@ func (e *Engine) MaybeSendAdvanceDecline(ctx context.Context, avg float64, state
 	}
 	key := fmt.Sprintf("ad:%s:%.4f", state, avg)
 	return e.send(ctx, "advance_decline", key, fmt.Sprintf("Advance/Decline alert=%s avg10=%.4f", state, avg))
+}
+
+type BullSpreadAlertInput struct {
+	K1Symbol string
+	K2Symbol string
+	Expiry   string
+	R        float64
+	Kind     string // "ATM" or "OTM"
+}
+
+func (e *Engine) MaybeSendBullSpreadBale(ctx context.Context, input BullSpreadAlertInput) (bool, error) {
+	threshold := e.cfg.BullSpreadATMThreshold
+	if input.Kind == "OTM" {
+		threshold = e.cfg.BullSpreadOTMThreshold
+	}
+	if threshold <= 0 || input.R < threshold {
+		return false, nil
+	}
+	key := fmt.Sprintf("bale-bs:%s:%s:%s:%.2f", input.Kind, input.Expiry, input.K2Symbol, input.R)
+	msg := fmt.Sprintf("📊 بول کال اسپرد (%s)\n%s / %s\nانقضا: %s\nریوارد/ریسک: %.2f",
+		input.Kind, input.K1Symbol, input.K2Symbol, input.Expiry, input.R)
+	return e.send(ctx, "bale_bull_spread", key, msg)
 }
 
 func (e *Engine) MaybeSendMatrixAlert(ctx context.Context, ruleID string, diff float64, message string) (bool, error) {

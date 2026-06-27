@@ -18,7 +18,7 @@ import (
 func TestDashboardPageRenders(t *testing.T) {
 	cfg := &config.Config{}
 	scan := scanner.NewService(cfg, nil, nil, nil, nil, nil)
-	srv := server.New(cfg, nil, slog.Default(), "migrations", false, scan)
+	srv := server.New(cfg, slog.Default(), scan)
 
 	req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
 	rec := httptest.NewRecorder()
@@ -39,7 +39,7 @@ func TestDashboardPageRenders(t *testing.T) {
 
 func TestHealthStillIndependent(t *testing.T) {
 	cfg := &config.Config{}
-	srv := server.New(cfg, nil, slog.Default(), "migrations", false, nil)
+	srv := server.New(cfg, slog.Default(), nil)
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
@@ -51,7 +51,7 @@ func TestHealthStillIndependent(t *testing.T) {
 func TestSnapshotCache(t *testing.T) {
 	cfg := &config.Config{}
 	scan := scanner.NewService(cfg, nil, nil, nil, nil, nil)
-	srv := server.New(cfg, nil, slog.Default(), "migrations", false, scan)
+	srv := server.New(cfg, slog.Default(), scan)
 	h := srv.Handler()
 	for i := 0; i < 2; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
@@ -67,7 +67,7 @@ func TestSnapshotCache(t *testing.T) {
 func TestMatrixPageRenders(t *testing.T) {
 	cfg := &config.Config{}
 	scan := scanner.NewService(cfg, nil, nil, nil, nil, nil)
-	srv := server.New(cfg, nil, slog.Default(), "migrations", false, scan)
+	srv := server.New(cfg, slog.Default(), scan)
 
 	req := httptest.NewRequest(http.MethodGet, "/matrix", nil)
 	rec := httptest.NewRecorder()

@@ -14,13 +14,13 @@ type CoveredCall struct {
 	Symbol       string  `json:"symbol"`
 	Expiry       string  `json:"expiry"`
 	DaysToExpiry int     `json:"days_to_expiry"`
-	Underlying   float64 `json:"underlying"`   // S
-	OptionPrice  float64 `json:"option_price"` // C
-	Strike       float64 `json:"strike"`       // K
+	Underlying   float64 `json:"underlying"`    // S — kept for alert calcs, not shown in table
+	OptionPrice  float64 `json:"option_price"`  // C
+	Strike       float64 `json:"strike"`        // K
 	NetCost      float64 `json:"net_cost"`
+	IV           float64 `json:"iv"`            // implied volatility %, populated by service
 	StaticROIPct float64 `json:"static_roi_pct"`
 	MaxROIPct    float64 `json:"max_roi_pct"`
-	BreakEven    float64 `json:"break_even"`
 	TradeVolume  float64 `json:"trade_volume"`
 }
 
@@ -89,7 +89,6 @@ func calculate(opt sourcearena.Option, underlyingPrice float64, days int) (Cover
 		NetCost:      netCost,
 		StaticROIPct: staticROI,
 		MaxROIPct:    maxROI,
-		BreakEven:    s - c,
 		TradeVolume:  opt.TradeVolume,
 	}, true
 }
