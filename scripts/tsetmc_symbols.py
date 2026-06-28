@@ -39,16 +39,20 @@ FIELDS = ["ins_code", "symbol", "company_name", "isin", "instrument_id"]
 SEARCH_LIMIT = 40  # API caps each search at 40 results
 
 
+def _s(v) -> str:
+    return (v or "").strip()
+
+
 def parse_search_item(item: dict) -> dict | None:
-    code = item.get("insCode", "").strip()
+    code = _s(item.get("insCode"))
     if not code:
         return None
     return {
         "ins_code": code,
-        "symbol": item.get("lVal18AFC", "").strip(),
-        "company_name": item.get("lVal30", "").strip(),
-        "isin": item.get("cIsin", "").strip(),
-        "instrument_id": item.get("instrumentID", "").strip(),
+        "symbol": _s(item.get("lVal18AFC")),
+        "company_name": _s(item.get("lVal30")),
+        "isin": _s(item.get("cIsin")),
+        "instrument_id": _s(item.get("instrumentID")),
     }
 
 
