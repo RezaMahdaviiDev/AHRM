@@ -2,8 +2,8 @@
 tsetmc_symbols.py — یک‌بار کراول همه نمادهای tsetmc.com
 
 خروجی:  data/symbols.json  و  data/symbols.csv
-اجرا:   python scripts/tsetmc_symbols.py
-نیاز:   pip install requests
+اجرا:   python3 scripts/tsetmc_symbols.py
+نیاز:   requests (معمولاً از پیش نصب است روی Ubuntu)
 """
 
 import csv
@@ -15,7 +15,7 @@ import time
 try:
     import requests
 except ImportError:
-    sys.exit("requests not installed — run: pip install requests")
+    sys.exit("requests not installed — run: pip3 install requests")
 
 HEADERS = {
     "User-Agent": (
@@ -27,25 +27,63 @@ HEADERS = {
     "Accept": "application/json",
 }
 
-CDN_URL = (
+SEARCH_URL = "https://cdn.tsetmc.com/api/Instrument/GetInstrumentSearch/{term}"
+MARKETWATCH_URL = (
     "https://cdn.tsetmc.com/api/ClosingPrice/GetMarketWatch"
     "?market=0&industry=0&isNoFilter=true&isAggregate=false"
 )
 
+PERSIAN_LETTERS = "ابپتثجچحخدذرزژسشصضطظعغفقکگلمنوهی"
 FIELDS = ["ins_code", "symbol", "company_name", "isin", "instrument_id"]
 
+SEARCH_LIMIT = 40  # API caps each search at 40 results
 
-def fetch_cdn() -> dict:
-    print("Fetching from CDN JSON API …")
-    r = requests.get(CDN_URL, headers=HEADERS, timeout=30)
-    r.raise_for_status()
-    data = r.json()
-    rows = data.get("marketWatch", [])
-    seen: dict[str, dict] = {}
+
+def parse_search_item(item: dict) -> dict | None:
+    code = item.get("insCode", "").strip()
+    if not code:
+        return None
+    return {
+        "ins_code": code,
+        "symbol": item.get("lVal18AFC", "").strip(),
+        "company_name": item.get("lVal30", "").strip(),
+        "isin": item.get("cIsin", "").strip(),
+        "instrument_id": item.get("instrumentID", "").strip(),
+    }
+
+
+def search(term: str, seen: dict) -> int:
+    """Search by term and add new instruments to seen dict. Returns how many added."""
+    try:
+        r = requests.get(SEARCH_URL.format(term=term), headers=HEADERS, timeout=20)
+        r.raise_for_status()
+        items = r.json().get("instrumentSearch", [])
+    except Exception as e:
+        print(f"  warn: search '{term}' failed: {e}", flush=True)
+        return 0
+    added = 0
+    for item in items:
+        parsed = parse_search_item(item)
+        if parsed and parsed["ins_code"] not in seen:
+            seen[parsed["ins_code"]] = parsed
+            added += 1
+    return added
+
+
+def fetch_market_watch(seen: dict) -> int:
+    """Try market watch (works during market hours). Returns how many added."""
+    try:
+        r = requests.get(MARKETWATCH_URL, headers=HEADERS, timeout=30)
+        r.raise_for_status()
+        rows = r.json().get("marketwatch", []) or r.json().get("marketWatch", [])
+    except Exception as e:
+        print(f"  warn: market watch failed: {e}", flush=True)
+        return 0
+    added = 0
     for item in rows:
         inst = item.get("instrument", {})
         code = inst.get("insCode", "").strip()
-        if not code:
+        if not code or code in seen:
             continue
         seen[code] = {
             "ins_code": code,
@@ -54,51 +92,43 @@ def fetch_cdn() -> dict:
             "isin": inst.get("cIsin", "").strip(),
             "instrument_id": inst.get("instrumentID", "").strip(),
         }
-    return seen
-
-
-def fetch_old_api() -> dict:
-    """Fallback: old pipe-separated market watch endpoint."""
-    print("CDN failed — trying old text API …")
-    url = "http://www.tsetmc.com/tsev2/data/MarketWatchPlus.aspx?h=0&r=0"
-    r = requests.get(url, headers=HEADERS, timeout=30)
-    r.raise_for_status()
-    text = r.text
-    seen: dict[str, dict] = {}
-    # Format: sections separated by "@"; first section is instrument list
-    # Each row: insCode,isin,instrumentID,lVal18AFC,lVal30,...
-    section = text.split("@")[0] if "@" in text else text
-    for line in section.splitlines():
-        parts = line.split(",")
-        if len(parts) < 5:
-            continue
-        code = parts[0].strip()
-        if not code:
-            continue
-        seen[code] = {
-            "ins_code": code,
-            "isin": parts[1].strip() if len(parts) > 1 else "",
-            "instrument_id": parts[2].strip() if len(parts) > 2 else "",
-            "symbol": parts[3].strip() if len(parts) > 3 else "",
-            "company_name": parts[4].strip() if len(parts) > 4 else "",
-        }
-    return seen
+        added += 1
+    return added
 
 
 def main() -> None:
     seen: dict[str, dict] = {}
 
-    try:
-        seen = fetch_cdn()
-    except Exception as e:
-        print(f"CDN error: {e}")
-        try:
-            seen = fetch_old_api()
-        except Exception as e2:
-            sys.exit(f"Both endpoints failed: {e2}")
+    # Phase 1: market watch (works during trading hours)
+    print("Phase 1: market watch …", flush=True)
+    n = fetch_market_watch(seen)
+    print(f"  → {n} from market watch (total: {len(seen)})", flush=True)
+
+    # Phase 2: search by every single Persian letter
+    print("Phase 2: single-letter searches …", flush=True)
+    saturated: list[str] = []  # letters that hit the 40-result cap
+    for ch in PERSIAN_LETTERS:
+        before = len(seen)
+        results_count = search(ch, seen)
+        added = len(seen) - before
+        if results_count >= SEARCH_LIMIT:
+            saturated.append(ch)
+        time.sleep(0.15)
+    print(f"  → total after phase 2: {len(seen)}", flush=True)
+    print(f"  → saturated letters (need 2-char drill): {''.join(saturated)}", flush=True)
+
+    # Phase 3: two-character searches for saturated letters
+    if saturated:
+        print("Phase 3: two-char drill for saturated letters …", flush=True)
+        for prefix in saturated:
+            for ch in PERSIAN_LETTERS:
+                term = prefix + ch
+                search(term, seen)
+                time.sleep(0.1)
+            print(f"  → after '{prefix}*': {len(seen)}", flush=True)
 
     if not seen:
-        sys.exit("No instruments returned — check network or tsetmc availability")
+        sys.exit("No instruments found — check network/tsetmc availability")
 
     instruments = sorted(seen.values(), key=lambda x: x["symbol"])
 
@@ -117,7 +147,7 @@ def main() -> None:
         w.writeheader()
         w.writerows(instruments)
 
-    print(f"Fetched {len(instruments)} instruments → {json_path}, {csv_path}")
+    print(f"\nDone: {len(instruments)} instruments → {json_path}, {csv_path}")
 
 
 if __name__ == "__main__":
