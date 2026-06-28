@@ -23,14 +23,18 @@ type Config struct {
 }
 
 type Engine struct {
-	cfg    Config
-	sender MessageSender
-	store  AlertStore
+	cfg     Config
+	sender  MessageSender
+	store   AlertStore
+	onAlert func(string) // called after each successful send; nil = disabled
 }
 
 func NewEngine(cfg Config, sender MessageSender, store AlertStore) *Engine {
 	return &Engine{cfg: cfg, sender: sender, store: store}
 }
+
+// SetOnAlert registers a callback invoked after every successful alert send.
+func (e *Engine) SetOnAlert(fn func(string)) { e.onAlert = fn }
 
 type ArbitrageAlertInput struct {
 	Symbol    string
@@ -133,6 +137,9 @@ func (e *Engine) send(ctx context.Context, alertType, key, message string) (bool
 	payload, _ := json.Marshal(map[string]string{"message": message})
 	if err := e.store.Record(ctx, alertType, key, payload); err != nil {
 		return false, err
+	}
+	if e.onAlert != nil {
+		go e.onAlert(message)
 	}
 	return true, nil
 }
