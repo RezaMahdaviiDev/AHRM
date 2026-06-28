@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>{{.Title}} | AHRM</title>
+  <style>
+    body { font-family: Tahoma, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+    header { background: #1e293b; padding: 1rem 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+    header a { color: #93c5fd; text-decoration: none; }
+    main { padding: 1.5rem 2rem; }
+    input { width: 100%; box-sizing: border-box; padding: 8px 12px; margin-bottom: 12px;
+            background: #1e293b; color: #e2e8f0; border: 1px solid #334155;
+            border-radius: 4px; font-size: 14px; font-family: Tahoma, sans-serif; }
+    input::placeholder { color: #64748b; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #1e293b; color: #94a3b8; padding: 8px 10px; text-align: right;
+         border-bottom: 2px solid #334155; position: sticky; top: 0; }
+    td { padding: 6px 10px; border-bottom: 1px solid #1e293b; }
+    tr:hover td { background: #1e293b; }
+    .mono { font-family: monospace; font-size: 11px; color: #94a3b8; }
+    .empty { color: #64748b; padding: 2rem; text-align: center; }
+    #count { font-size: 12px; color: #64748b; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>AHRM Scanner</strong>
+    <a href="/dashboard">داشبورد</a>
+    <a href="/arbitrage">آربیتراژ</a>
+    <a href="/hv">HV</a>
+    <a href="/market">بازار</a>
+    <a href="/matrix">ماتریس</a>
+    <a href="/covered-call">کاوردکال</a>
+    <a href="/bull-spread">بول اسپرد</a>
+    <a href="/chart">نمودار</a>
+    <a href="/queue" style="color:#fbbf24;font-weight:bold">صف سرخطی</a>
+    <a href="/symbols" style="color:#34d399;font-weight:bold">نمادها</a>
+  </header>
+  <main>
+    <h1>دایرکتوری نمادها</h1>
+    {{if .Instruments}}
+    <input id="q" type="search" placeholder="جستجو — نماد یا نام شرکت یا insCode یا ISIN …"
+           oninput="filter(this.value)" autofocus>
+    <div id="count">{{len .Instruments}} نماد</div>
+    <table>
+      <thead>
+        <tr>
+          <th>نماد</th>
+          <th>نام شرکت</th>
+          <th>insCode</th>
+          <th>ISIN</th>
+          <th>instrumentID</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        {{range .Instruments}}
+        <tr>
+          <td><strong>{{.Symbol}}</strong></td>
+          <td>{{.CompanyName}}</td>
+          <td class="mono">{{.InsCode}}</td>
+          <td class="mono">{{.ISIN}}</td>
+          <td class="mono">{{.InstrumentID}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <div class="empty">
+      داده‌ای موجود نیست.<br>
+      ابتدا اجرا کنید: <code>python scripts/tsetmc_symbols.py</code>
+    </div>
+    {{end}}
+  </main>
+  <script>
+  var total = {{len .Instruments}};
+  function filter(q) {
+    q = q.toLowerCase();
+    var rows = document.querySelectorAll('#tbody tr');
+    var shown = 0;
+    rows.forEach(function(r) {
+      var match = !q || r.textContent.toLowerCase().indexOf(q) !== -1;
+      r.hidden = !match;
+      if (match) shown++;
+    });
+    document.getElementById('count').textContent =
+      q ? (shown + ' از ' + total + ' نماد') : (total + ' نماد');
+  }
+  </script>
+<script src="/static/alerts.js"></script>
+</body>
+</html>
