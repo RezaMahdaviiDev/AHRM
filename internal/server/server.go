@@ -55,10 +55,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /ready", s.handleReady)
 	mux.HandleFunc("GET /events", s.handleEvents)
 	mux.HandleFunc("GET /static/alerts.js", s.handleAlertsJS)
-	mux.HandleFunc("GET /test-alert", func(w http.ResponseWriter, _ *http.Request) {
-		s.broadcaster.Publish("🔔 تست الارم — اگر این پیام را می‌بینید، سیستم نوتیف کار می‌کند")
-		_, _ = w.Write([]byte("ok"))
-	})
 	if s.scanner != nil {
 		s.registerPages(mux)
 	}
