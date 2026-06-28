@@ -61,7 +61,7 @@ func (s *SQLiteStore) WasSent(_ context.Context, alertType, key string) (bool, e
 	defer s.mu.Unlock()
 	var count int
 	err := s.db.QueryRow(
-		`SELECT COUNT(*) FROM alert_history WHERE alert_type = ? AND alert_key = ?`,
+		`SELECT COUNT(*) FROM alert_history WHERE alert_type = ? AND alert_key = ? AND sent_at > datetime('now', '-24 hours')`,
 		alertType, digest,
 	).Scan(&count)
 	return count > 0, err

@@ -51,7 +51,7 @@ func (e *Engine) MaybeSendArbitrageR12(ctx context.Context, input ArbitrageAlert
 	if e.cfg.ArbitrageR12Threshold <= 0 || input.ReturnPct < e.cfg.ArbitrageR12Threshold {
 		return false, nil
 	}
-	key := fmt.Sprintf("bale-arb-r12:%s:%.0f:%.2f", input.Expiry, input.Strike, input.ReturnPct)
+	key := fmt.Sprintf("bale-arb-r12:%s:%.0f", input.Expiry, input.Strike)
 	msg := fmt.Sprintf("🔔 فرصت آربیتراژ\nنماد: %s\nاسترایک: %.0f\nانقضا: %s\nR'(S×۱.۱۲۵): %.2f%%", input.Symbol, input.Strike, input.Expiry, input.ReturnPct)
 	return e.send(ctx, "bale_arb_r12", key, msg)
 }
@@ -67,7 +67,7 @@ func (e *Engine) MaybeSendCoveredCallROI(ctx context.Context, input CoveredCallA
 	if e.cfg.CoveredCallROIThreshold <= 0 || input.StaticROIPct < e.cfg.CoveredCallROIThreshold {
 		return false, nil
 	}
-	key := fmt.Sprintf("bale-cc-roi:%s:%.0f:%.2f", input.Expiry, input.Strike, input.StaticROIPct)
+	key := fmt.Sprintf("bale-cc-roi:%s:%.0f", input.Expiry, input.Strike)
 	msg := fmt.Sprintf("📈 کاورد کال پربازده\nنماد: %s\nاسترایک: %.0f\nانقضا: %s\nStatic ROI: %.2f%%",
 		input.Symbol, input.Strike, input.Expiry, input.StaticROIPct)
 	return e.send(ctx, "bale_cc_roi", key, msg)
@@ -77,7 +77,7 @@ func (e *Engine) MaybeSendBreadth(ctx context.Context, avg float64, state string
 	if state == "normal" {
 		return false, nil
 	}
-	key := fmt.Sprintf("breadth:%s:%.4f", state, avg)
+	key := fmt.Sprintf("breadth:%s", state)
 	return e.send(ctx, "breadth", key, fmt.Sprintf("Breadth Thrust alert=%s avg10=%.4f", state, avg))
 }
 
@@ -85,7 +85,7 @@ func (e *Engine) MaybeSendAdvanceDecline(ctx context.Context, avg float64, state
 	if state == "normal" {
 		return false, nil
 	}
-	key := fmt.Sprintf("ad:%s:%.4f", state, avg)
+	key := fmt.Sprintf("ad:%s", state)
 	return e.send(ctx, "advance_decline", key, fmt.Sprintf("Advance/Decline alert=%s avg10=%.4f", state, avg))
 }
 
@@ -105,14 +105,14 @@ func (e *Engine) MaybeSendBullSpreadBale(ctx context.Context, input BullSpreadAl
 	if threshold <= 0 || input.R < threshold {
 		return false, nil
 	}
-	key := fmt.Sprintf("bale-bs:%s:%s:%s:%.2f", input.Kind, input.Expiry, input.K2Symbol, input.R)
+	key := fmt.Sprintf("bale-bs:%s:%s:%s", input.Kind, input.Expiry, input.K2Symbol)
 	msg := fmt.Sprintf("📊 بول کال اسپرد (%s)\n%s / %s\nانقضا: %s\nریوارد/ریسک: %.2f",
 		input.Kind, input.K1Symbol, input.K2Symbol, input.Expiry, input.R)
 	return e.send(ctx, "bale_bull_spread", key, msg)
 }
 
 func (e *Engine) MaybeSendMatrixAlert(ctx context.Context, ruleID string, diff float64, message string) (bool, error) {
-	key := fmt.Sprintf("matrix:%s:%.0f", ruleID, diff)
+	key := fmt.Sprintf("matrix:%s", ruleID)
 	return e.send(ctx, "matrix", key, message)
 }
 
