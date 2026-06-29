@@ -39,7 +39,7 @@
   <main>
     <h1>دایرکتوری نمادها</h1>
     {{if .Instruments}}
-    <input id="q" type="search" placeholder="جستجو — نماد یا نام شرکت یا insCode یا ISIN …"
+    <input id="q" type="search" placeholder="جستجو — نماد یا نام شرکت یا instrumentID …"
            oninput="filter(this.value)" autofocus>
     <div id="count">{{len .Instruments}} نماد</div>
     <table>
@@ -47,8 +47,6 @@
         <tr>
           <th>نماد</th>
           <th>نام شرکت</th>
-          <th>insCode</th>
-          <th>ISIN</th>
           <th>instrumentID</th>
         </tr>
       </thead>
@@ -57,8 +55,6 @@
         <tr>
           <td><strong>{{.Symbol}}</strong></td>
           <td>{{.CompanyName}}</td>
-          <td class="mono">{{.InsCode}}</td>
-          <td class="mono">{{.ISIN}}</td>
           <td class="mono">{{.InstrumentID}}</td>
         </tr>
         {{end}}

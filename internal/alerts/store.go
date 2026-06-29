@@ -71,8 +71,10 @@ func (s *SQLiteStore) Record(_ context.Context, alertType, key string, payload [
 	digest := hashKey(alertType + ":" + key)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// INSERT OR REPLACE so sent_at is refreshed on re-send after 24 h; OR IGNORE would leave
+	// a stale timestamp that keeps WasSent returning false, causing infinite re-sends.
 	_, err := s.db.Exec(
-		`INSERT OR IGNORE INTO alert_history (alert_type, alert_key, payload, sent_at) VALUES (?, ?, ?, ?)`,
+		`INSERT OR REPLACE INTO alert_history (alert_type, alert_key, payload, sent_at) VALUES (?, ?, ?, ?)`,
 		alertType, digest, string(payload), time.Now().UTC().Format("2006-01-02 15:04:05"),
 	)
 	return err

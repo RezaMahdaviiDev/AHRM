@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.7.1 — 2026-06-29 — رفع باگ اسپم بله پس از ۲۴ ساعت
+
+### رفع باگ: هر ۳ دقیقه پیام تکراری بعد از گذشت یک روز
+
+**مشکل:** پس از گذشت ۲۴ ساعت از اولین ارسال، سیستم هر ۳ دقیقه (هر چرخه scan)
+پیام‌های تکراری می‌فرستاد. امروز ۲۹ خرداد بین ۸۰–۱۰۰ پیام ارسال شد.
+
+**ریشه:** ترکیب سمی `INSERT OR IGNORE` + پنجره ۲۴ ساعته در `WasSent`:
+```
+۱. روز اول ساعت ۹: رکورد insert شد (sent_at = ۰۸:۵۰ UTC روز قبل)
+۲. روز بعد ساعت ۹: WasSent → sent_at < now-24h → false (پیر شده)
+۳. پیام ارسال می‌شود ✓
+۴. INSERT OR IGNORE → رکورد قدیمی هنوز هست → IGNORE می‌کند، sent_at به‌روز نمی‌شود
+۵. ۳ دقیقه بعد: WasSent باز false → ارسال مجدد → هر ۳ دقیقه تا ابد!
+```
+
+**راه‌حل:** در `internal/alerts/store.go` تابع `Record`:
+- `INSERT OR IGNORE` → **`INSERT OR REPLACE`**
+- حالا وقتی re-send اتفاق می‌افتد، `sent_at` رفرش می‌شود
+- چرخه بعدی: `WasSent` رکورد تازه را می‌بیند → true → ارسال نمی‌شود ✓
+
+**رفع فوری DB (بدون restart):**
+```sql
+UPDATE alert_history SET sent_at = datetime('now')
+WHERE sent_at < datetime('now', '-24 hours');
+-- 293 ردیف به‌روز شد
+```
+
+**نکته برای آینده:** اگر مجدداً اسپم بله دیده شد، اول این را چک کن:
+```sql
+SELECT COUNT(*) FROM data/alerts.db alert_history
+WHERE sent_at < datetime('now', '-24 hours');
+```
+اگر عدد بزرگی برگشت → باگ همین است → دستور UPDATE بالا را اجرا کن.
+
+### فایل‌های تغییریافته
+- `internal/alerts/store.go` — `INSERT OR IGNORE` → `INSERT OR REPLACE` در تابع `Record`
+
+---
+
 ## v0.5.1 — 2026-06-28 — "یک الارم در روز"
 
 ### رفع باگ: الارم‌های تکراری در بله
