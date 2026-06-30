@@ -40,30 +40,9 @@ func (s *Server) registerPages(mux *http.ServeMux) {
 	mux.HandleFunc("GET /covered-call", s.pageHandler("covered-call.html", "Covered Call"))
 	mux.HandleFunc("GET /matrix", s.pageHandler("matrix.html", "Matrix"))
 	mux.HandleFunc("GET /bull-spread", s.pageHandler("bull-spread.html", "Bull Call Spread"))
-	mux.HandleFunc("GET /chart", s.pageHandler("chart.html", "نمودار"))
-	mux.HandleFunc("GET /queue", s.pageHandler("queue.html", "صف خرید سرخطی"))
-	mux.HandleFunc("GET /symbols", s.handleSymbols)
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dashboard", http.StatusFound)
 	})
-}
-
-func (s *Server) handleSymbols(w http.ResponseWriter, _ *http.Request) {
-	type symbolsData struct {
-		Title       string
-		Instruments []Instrument
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if s.templates == nil {
-		http.Error(w, "templates not loaded", http.StatusInternalServerError)
-		return
-	}
-	if err := s.templates.ExecuteTemplate(w, "symbols.html", symbolsData{
-		Title:       "نمادها",
-		Instruments: s.instruments,
-	}); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
 }
 
 func (s *Server) initTemplates() {

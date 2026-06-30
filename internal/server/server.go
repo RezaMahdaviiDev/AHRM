@@ -29,7 +29,6 @@ type Server struct {
 	snapAt          time.Time
 	refreshInterval time.Duration
 	refreshSeconds  int
-	instruments     []Instrument
 }
 
 func New(cfg *config.Config, logger *slog.Logger, scan *scanner.Service) *Server {
@@ -49,11 +48,6 @@ func New(cfg *config.Config, logger *slog.Logger, scan *scanner.Service) *Server
 
 // Broadcaster returns the server's event broadcaster so callers can wire alert callbacks.
 func (s *Server) Broadcaster() *Broadcaster { return s.broadcaster }
-
-// LoadInstruments reads symbols.json from path and caches it for the /symbols page.
-func (s *Server) LoadInstruments(path string) {
-	s.instruments = loadInstruments(path)
-}
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
