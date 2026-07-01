@@ -124,7 +124,11 @@ func extractReason(text string) string {
 		if end > len(text) {
 			end = len(text)
 		}
-		return strings.TrimSpace(text[start:end])
+		snippet := strings.TrimSpace(text[start:end])
+		if strings.Contains(snippet, "بدون پیام توقف") || strings.Contains(snippet, "فاقد پیام توقف") {
+			continue
+		}
+		return snippet
 	}
 	return ""
 }
