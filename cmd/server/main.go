@@ -69,7 +69,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	scan := scanner.NewService(cfg, saClient, sqliteStore, sqliteStore, sqliteStore, alertEngine)
+	scan := scanner.NewService(cfg, saClient, sqliteStore, sqliteStore, sqliteStore, sqliteStore, alertEngine)
 
 	srv := server.New(cfg, logger, scan)
 	alertEngine.SetOnAlert(srv.Broadcaster().Publish)
@@ -78,6 +78,7 @@ func main() {
 	defer stopRefresh()
 	srv.StartBackgroundRefresh(refreshCtx)
 	scan.StartBackfillScheduler(refreshCtx)
+	scan.StartSymbolHaltScheduler(refreshCtx)
 
 	logReadiness(logger, srv.ReadinessReport())
 

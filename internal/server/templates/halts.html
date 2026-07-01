@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="{{.RefreshSeconds}}">
+  <title>{{.Title}} | AHRM</title>
+  <style>
+    body { font-family: Tahoma, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+    header { background: #1e293b; padding: 1rem 2rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+    header a { color: #93c5fd; text-decoration: none; }
+    .update-bar { background: #1e293b; padding: 0.5rem 2rem; font-size: 0.9rem; color: #94a3b8; border-bottom: 1px solid #334155; }
+    main { padding: 1.5rem 2rem; }
+    .card { background: #1e293b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .muted { color: #94a3b8; }
+    table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; }
+    td, th { border: 1px solid #334155; padding: 0.5rem 0.75rem; text-align: center; vertical-align: top; }
+    th { background: #0f172a; }
+    tr:nth-child(even) { background: #172033; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>AHRM Scanner</strong>
+    <a href="/dashboard">داشبورد</a>
+    <a href="/arbitrage">آربیتراژ</a>
+    <a href="/hv">HV</a>
+    <a href="/market">بازار</a>
+    <a href="/matrix">ماتریس</a>
+    <a href="/covered-call">کاوردکال</a>
+    <a href="/bull-spread">بول اسپرد</a>
+    <a href="/halts">توقف نمادها</a>
+  </header>
+  <div class="update-bar">آخرین به‌روزرسانی: {{.LastUpdatedTehran}} (ایران) · رفرش خودکار هر {{.RefreshMinutes}} دقیقه</div>
+  <main>
+    <h1>نمادهای متوقف</h1>
+    <div class="card">
+      <p>آخرین همگام‌سازی لیست توقف‌ها: {{.SymbolHaltsCheckedAtTehran}} (ایران)</p>
+      <p class="muted">این لیست روزی یک‌بار از <code>closed_symbols</code> به‌روزرسانی می‌شود و علت/زمان توقف از پیام ناظر (<code>inspect=all</code>) استخراج می‌شود. در زمان بازار، هر ۲ دقیقه پیام ناظر برای اعلان آغاز بازگشایی پایش می‌شود.</p>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>نماد</th>
+          <th>وضعیت</th>
+          <th>دسته‌بندی علت</th>
+          <th>علت توقف</th>
+          <th>زمان توقف</th>
+          <th>زمان پیام ناظر</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Snapshot.SymbolHalts}}
+        <tr>
+          <td>{{.Name}}</td>
+          <td>{{if .Status}}{{.Status}}{{else}}halted{{end}}</td>
+          <td>{{if .HaltCategory}}{{.HaltCategory}}{{else}}—{{end}}</td>
+          <td style="text-align:right">{{if .HaltReason}}{{.HaltReason}}{{else if .SupervisorMessage}}{{.SupervisorMessage}}{{else}}—{{end}}</td>
+          <td>{{if .HaltedAt}}{{.HaltedAt}}{{else}}—{{end}}</td>
+          <td>{{if .SupervisorMessageAt}}{{.SupervisorMessageAt}}{{else}}—{{end}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="6">نماد متوقفی ثبت نشده است.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+
+    {{if .Snapshot.Errors}}
+    <div class="card">
+      <strong>خطاها</strong>
+      {{range .Snapshot.Errors}}<p class="muted">{{.}}</p>{{end}}
+    </div>
+    {{end}}
+  </main>
+<script src="/static/alerts.js"></script>
+</body>
+</html>
+

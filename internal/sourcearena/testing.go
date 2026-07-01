@@ -18,6 +18,14 @@ func DecodeCandlesForTest(raw []byte) ([]Candle, error) {
 	return decodeCandles(json.RawMessage(raw))
 }
 
+func DecodeClosedSymbolsForTest(raw []byte) ([]ClosedSymbol, error) {
+	return decodeClosedSymbols(json.RawMessage(raw))
+}
+
+func DecodeSupervisorMessagesForTest(raw []byte) ([]SupervisorMessage, error) {
+	return decodeSupervisorMessages(json.RawMessage(raw))
+}
+
 // NewTestClient builds a client pointed at test server URLs.
 // marketBaseURL serves options/symbols; candleBaseURL serves candles.
 func NewTestClient(cfg config.SourceArenaConfig, marketBaseURL, candleBaseURL string, store RawStore) *Client {

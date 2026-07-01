@@ -64,6 +64,27 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 		db.Close()
 		return nil, err
 	}
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS symbol_halts (
+		name                  TEXT PRIMARY KEY,
+		status                TEXT NOT NULL DEFAULT '',
+		halt_category         TEXT NOT NULL DEFAULT '',
+		halt_reason           TEXT NOT NULL DEFAULT '',
+		halted_at             TEXT NOT NULL DEFAULT '',
+		supervisor_message    TEXT NOT NULL DEFAULT '',
+		supervisor_message_at TEXT NOT NULL DEFAULT ''
+	)`)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS symbol_halt_sync (
+		id         INTEGER PRIMARY KEY CHECK (id = 1),
+		checked_at TEXT NOT NULL DEFAULT ''
+	)`)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
 	// Remove any zero-total rows written during market holidays (Scenario B).
 	db.Exec(`DELETE FROM market_daily_stats WHERE total = 0`)
 	return &SQLiteStore{db: db}, nil
@@ -307,6 +328,89 @@ func (s *SQLiteStore) RegisterSymbols(ctx context.Context, names []string) ([]st
 		newNames = append(newNames, n)
 	}
 	return newNames, rows.Err()
+}
+
+func (s *SQLiteStore) ReplaceSymbolHalts(ctx context.Context, checkedAt time.Time, halts []SymbolHalt) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if _, err = tx.ExecContext(ctx, `DELETE FROM symbol_halts`); err != nil {
+		return err
+	}
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO symbol_halts (
+		name, status, halt_category, halt_reason, halted_at, supervisor_message, supervisor_message_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, halt := range halts {
+		if _, err = stmt.ExecContext(
+			ctx,
+			halt.Name,
+			halt.Status,
+			halt.HaltCategory,
+			halt.HaltReason,
+			halt.HaltedAt,
+			halt.SupervisorMessage,
+			halt.SupervisorMessageAt,
+		); err != nil {
+			return err
+		}
+	}
+	if _, err = tx.ExecContext(ctx, `
+		INSERT INTO symbol_halt_sync (id, checked_at)
+		VALUES (1, ?)
+		ON CONFLICT(id) DO UPDATE SET checked_at = excluded.checked_at`,
+		checkedAt.UTC().Format("2006-01-02 15:04:05"),
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *SQLiteStore) LatestSymbolHalts(ctx context.Context) (time.Time, []SymbolHalt, error) {
+	var checkedRaw string
+	if err := s.db.QueryRowContext(ctx, `SELECT checked_at FROM symbol_halt_sync WHERE id = 1`).Scan(&checkedRaw); err != nil {
+		if err == sql.ErrNoRows {
+			return time.Time{}, nil, nil
+		}
+		return time.Time{}, nil, err
+	}
+	checkedAt, err := time.Parse("2006-01-02 15:04:05", checkedRaw)
+	if err != nil {
+		checkedAt = time.Time{}
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT name, status, halt_category, halt_reason, halted_at, supervisor_message, supervisor_message_at
+		FROM symbol_halts
+		ORDER BY name`)
+	if err != nil {
+		return checkedAt, nil, err
+	}
+	defer rows.Close()
+
+	halts := make([]SymbolHalt, 0)
+	for rows.Next() {
+		var halt SymbolHalt
+		if err = rows.Scan(
+			&halt.Name,
+			&halt.Status,
+			&halt.HaltCategory,
+			&halt.HaltReason,
+			&halt.HaltedAt,
+			&halt.SupervisorMessage,
+			&halt.SupervisorMessageAt,
+		); err != nil {
+			return checkedAt, nil, err
+		}
+		halts = append(halts, halt)
+	}
+	return checkedAt, halts, rows.Err()
 }
 
 func (s *SQLiteStore) Close() error {
