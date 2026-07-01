@@ -72,3 +72,36 @@ func TestMatrixAlertDuplicateProtection(t *testing.T) {
 		t.Fatalf("messages=%d", len(sender.messages))
 	}
 }
+
+func TestBullSpreadDedupIgnoresRFluctuation(t *testing.T) {
+	sender := &fakeSender{}
+	engine := alerts.NewEngine(alerts.Config{BullSpreadATMThreshold: 2.0}, sender, alerts.NewMemStore())
+
+	first := alerts.BullSpreadAlertInput{
+		K1Symbol: "ضهرم5033",
+		K2Symbol: "ضهرم5036",
+		Expiry:   "1404/09/15",
+		R:        2.87,
+		Kind:     "ATM",
+	}
+	sent, err := engine.MaybeSendBullSpreadBale(context.Background(), first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sent {
+		t.Fatal("expected first alert sent")
+	}
+
+	second := first
+	second.R = 2.52
+	sent, err = engine.MaybeSendBullSpreadBale(context.Background(), second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sent {
+		t.Fatal("expected duplicate suppressed despite R change")
+	}
+	if len(sender.messages) != 1 {
+		t.Fatalf("messages=%d", len(sender.messages))
+	}
+}
