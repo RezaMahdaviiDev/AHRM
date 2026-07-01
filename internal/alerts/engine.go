@@ -115,6 +115,25 @@ func (e *Engine) MaybeSendBullSpreadBale(ctx context.Context, input BullSpreadAl
 	return e.send(ctx, "bale_bull_spread", key, msg)
 }
 
+type SymbolReopenAlertInput struct {
+	Symbol      string
+	PublishedAt string
+	Message     string
+}
+
+func (e *Engine) MaybeSendSymbolReopen(ctx context.Context, input SymbolReopenAlertInput) (bool, error) {
+	if input.Symbol == "" || input.Message == "" {
+		return false, nil
+	}
+	stamp := input.PublishedAt
+	if stamp == "" {
+		stamp = "unknown"
+	}
+	key := fmt.Sprintf("symbol-reopen:%s:%s", input.Symbol, stamp)
+	msg := fmt.Sprintf("🔔 اعلام آغاز بازگشایی\nنماد: %s\nزمان پیام: %s\nمتن ناظر: %s", input.Symbol, stamp, input.Message)
+	return e.send(ctx, "symbol_reopen", key, msg)
+}
+
 func (e *Engine) MaybeSendMatrixAlert(ctx context.Context, ruleID string, diff float64, message string) (bool, error) {
 	key := fmt.Sprintf("matrix:%s", ruleID)
 	return e.send(ctx, "matrix", key, message)

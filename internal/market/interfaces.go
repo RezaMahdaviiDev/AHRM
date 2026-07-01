@@ -23,3 +23,29 @@ type SymbolRegistryStore interface {
 	RegisterSymbols(ctx context.Context, names []string) ([]string, error)
 	UpsertQueueStreaks(ctx context.Context, names []string) (map[string]int, error)
 }
+
+type SymbolHalt struct {
+	Name                string `json:"name"`
+	Status              string `json:"status"`
+	HaltCategory        string `json:"halt_category"`
+	HaltReason          string `json:"halt_reason"`
+	HaltedAt            string `json:"halted_at"`
+	SupervisorMessage   string `json:"supervisor_message"`
+	SupervisorMessageAt string `json:"supervisor_message_at"`
+}
+
+type SymbolHaltEvent struct {
+	Symbol     string `json:"symbol"`
+	EventType  string `json:"event_type"`
+	Reason     string `json:"reason"`
+	OccurredAt string `json:"occurred_at"`
+	Source     string `json:"source"`
+	RawMessage string `json:"raw_message"`
+}
+
+type SymbolHaltStore interface {
+	ReplaceSymbolHalts(ctx context.Context, checkedAt time.Time, halts []SymbolHalt) error
+	LatestSymbolHalts(ctx context.Context) (checkedAt time.Time, halts []SymbolHalt, err error)
+	AppendSymbolHaltEvents(ctx context.Context, events []SymbolHaltEvent) error
+	RecentSymbolHaltEvents(ctx context.Context, limit int) ([]SymbolHaltEvent, error)
+}

@@ -48,7 +48,7 @@ func TestRefreshWithMockAPI(t *testing.T) {
 
 	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "t"}, srv.URL, srv.URL, sourcearena.NopRawStore{})
 	cfg := &config.Config{}
-	svc := scanner.NewService(cfg, client, nil, nil, nil, nil)
+	svc := scanner.NewService(cfg, client, nil, nil, nil, nil, nil)
 	snap, err := svc.Refresh(context.Background())
 	if err != nil {
 		t.Fatal(err)

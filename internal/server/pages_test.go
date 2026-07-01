@@ -17,7 +17,7 @@ import (
 
 func TestDashboardPageRenders(t *testing.T) {
 	cfg := &config.Config{}
-	scan := scanner.NewService(cfg, nil, nil, nil, nil, nil)
+	scan := scanner.NewService(cfg, nil, nil, nil, nil, nil, nil)
 	srv := server.New(cfg, slog.Default(), scan)
 
 	req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
@@ -50,7 +50,7 @@ func TestHealthStillIndependent(t *testing.T) {
 
 func TestSnapshotCache(t *testing.T) {
 	cfg := &config.Config{}
-	scan := scanner.NewService(cfg, nil, nil, nil, nil, nil)
+	scan := scanner.NewService(cfg, nil, nil, nil, nil, nil, nil)
 	srv := server.New(cfg, slog.Default(), scan)
 	h := srv.Handler()
 	for i := 0; i < 2; i++ {
@@ -66,7 +66,7 @@ func TestSnapshotCache(t *testing.T) {
 
 func TestMatrixPageRenders(t *testing.T) {
 	cfg := &config.Config{}
-	scan := scanner.NewService(cfg, nil, nil, nil, nil, nil)
+	scan := scanner.NewService(cfg, nil, nil, nil, nil, nil, nil)
 	srv := server.New(cfg, slog.Default(), scan)
 
 	req := httptest.NewRequest(http.MethodGet, "/matrix", nil)
@@ -79,6 +79,24 @@ func TestMatrixPageRenders(t *testing.T) {
 	body, _ := io.ReadAll(rec.Body)
 	text := string(body)
 	if !strings.Contains(text, "AHRM") {
+		t.Fatalf("unexpected body: %s", body)
+	}
+}
+
+func TestHaltsPageRenders(t *testing.T) {
+	cfg := &config.Config{}
+	scan := scanner.NewService(cfg, nil, nil, nil, nil, nil, nil)
+	srv := server.New(cfg, slog.Default(), scan)
+
+	req := httptest.NewRequest(http.MethodGet, "/halts", nil)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	body, _ := io.ReadAll(rec.Body)
+	if !strings.Contains(string(body), "نمادهای متوقف") {
 		t.Fatalf("unexpected body: %s", body)
 	}
 }

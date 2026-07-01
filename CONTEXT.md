@@ -150,6 +150,28 @@ The ratio of Positive to Negative symbols on a day; the alerting signal is its r
 10-day average.
 _Avoid_: A/D line, breadth
 
+## Market Status
+
+**Symbol Halt**:
+A symbol currently suspended from normal trading and listed in the market's closed-symbols
+feed.
+_Avoid_: closed market, frozen price (those can happen without an official halt)
+
+**Supervisor Message**:
+The exchange observer's official operational message for a symbol (halt, pre-open, reopen,
+auction phase, etc.), used as the canonical text for halt reason and status updates.
+_Avoid_: rumor, publisher note, codal notice
+
+**Reopening Announcement**:
+A Supervisor Message explicitly announcing the start of reopening flow (for example:
+pre-open/order-entry or auction start).
+_Avoid_: any generic "update" message that does not start reopening
+
+**Halt Event**:
+A persisted historical record of one halt-related lifecycle message (halt, reopening, or
+other supervisor state transition) for a symbol.
+_Avoid_: treating the current halt snapshot as history (snapshot = latest state only)
+
 ## Aggregation & alerting
 
 **Snapshot**:

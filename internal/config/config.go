@@ -10,9 +10,11 @@ import (
 )
 
 type Config struct {
-	HTTPAddr         string
-	LogLevel         string
-	MatrixAlertsFile string
+	HTTPAddr               string
+	LogLevel               string
+	MatrixAlertsFile       string
+	BourseCrawlURLTemplate string
+	BourseCrawlUserAgent   string
 	RiskFreeRate           float64
 	SnapshotRefreshSeconds int
 	SourceArena            SourceArenaConfig
@@ -92,9 +94,11 @@ func loadEnvFiles() {
 
 func LoadFromEnv() (*Config, error) {
 	cfg := &Config{
-		HTTPAddr:         getenv("HTTP_ADDR", ":8080"),
-		LogLevel:         getenv("LOG_LEVEL", "info"),
-		MatrixAlertsFile: getenv("MATRIX_ALERTS_FILE", "configs/matrix_alerts.json"),
+		HTTPAddr:               getenv("HTTP_ADDR", ":8080"),
+		LogLevel:               getenv("LOG_LEVEL", "info"),
+		MatrixAlertsFile:       getenv("MATRIX_ALERTS_FILE", "configs/matrix_alerts.json"),
+		BourseCrawlURLTemplate: strings.TrimSpace(os.Getenv("BOURSE_CRAWL_URL_TEMPLATE")),
+		BourseCrawlUserAgent:   getenv("BOURSE_CRAWL_USER_AGENT", "AHRM/1.0 (+symbol-halt-fallback-crawler)"),
 		RiskFreeRate:           parseFloatEnv("RISK_FREE_RATE", 0.20),
 		SnapshotRefreshSeconds: parseIntEnv("SNAPSHOT_REFRESH_SECONDS", 180),
 		SourceArena: SourceArenaConfig{
@@ -121,6 +125,9 @@ func LoadFromEnv() (*Config, error) {
 }
 
 func (c *Config) Validate() error {
+	if c.BourseCrawlURLTemplate != "" && !strings.Contains(c.BourseCrawlURLTemplate, "{symbol}") {
+		return fmt.Errorf("bourse crawl: BOURSE_CRAWL_URL_TEMPLATE must include {symbol} placeholder")
+	}
 	if err := validateGroup("sourcearena", c.SourceArena.Configured(), map[string]string{
 		"SOURCEARENA_API_TOKEN": c.SourceArena.APIToken,
 	}); err != nil {

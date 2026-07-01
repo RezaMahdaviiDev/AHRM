@@ -9,6 +9,7 @@ import (
 
 	"ahrm/internal/alerts"
 	"ahrm/internal/arbitrage"
+	"ahrm/internal/boursecrawl"
 	"ahrm/internal/bullspread"
 	"ahrm/internal/config"
 	"ahrm/internal/coveredcall"
@@ -33,25 +34,27 @@ type BackfillProgress struct {
 }
 
 type Service struct {
-	cfg           *config.Config
-	client        *sourcearena.Client
-	marketStore   market.DailyStore
-	symbolStore   market.SymbolSnapshotStore
-	registryStore market.SymbolRegistryStore
-	backfilling     atomic.Bool
-	bfMu            sync.Mutex
-	bfProgress      BackfillProgress
+	cfg               *config.Config
+	client            *sourcearena.Client
+	marketStore       market.DailyStore
+	symbolStore       market.SymbolSnapshotStore
+	registryStore     market.SymbolRegistryStore
+	haltStore         market.SymbolHaltStore
+	bourseCrawler     *boursecrawl.Client
+	backfilling       atomic.Bool
+	bfMu              sync.Mutex
+	bfProgress        BackfillProgress
 	pairEngine        *pairs.Engine
 	arbEngine         *arbitrage.Engine
 	coveredCallEngine *coveredcall.Engine
 	ivEngine          *ivcalc.Engine
 	hvEngine          *hv.Engine
 	bullSpreadEngine  *bullspread.Engine
-	breadth    *indicators.BreadthEngine
-	advance    *indicators.AdvanceDeclineEngine
-	matrix      *matrix.Engine
-	matrixRules []matrixalerts.Rule
-	alerts      *alerts.Engine
+	breadth           *indicators.BreadthEngine
+	advance           *indicators.AdvanceDeclineEngine
+	matrix            *matrix.Engine
+	matrixRules       []matrixalerts.Rule
+	alerts            *alerts.Engine
 }
 
 type HVFetch struct {
@@ -74,37 +77,42 @@ type DailyRow struct {
 }
 
 type Snapshot struct {
-	GeneratedAt   time.Time                    `json:"generated_at"`
-	Underlying    sourcearena.SymbolQuote      `json:"underlying"`
-	HV            hv.Result                    `json:"hv"`
-	HVFetch       HVFetch                      `json:"hv_fetch"`
-	Breadth       indicators.IndicatorResult   `json:"breadth"`
-	AdvanceDecline indicators.IndicatorResult  `json:"advance_decline"`
-	DailyHistory      []DailyRow                    `json:"daily_history,omitempty"`
-	Opportunities     []arbitrage.Opportunity       `json:"opportunities"`
-	CoveredCalls      []coveredcall.CoveredCall     `json:"covered_calls"`
-	ImpliedVolatility []ivcalc.IVResult             `json:"implied_volatility"`
-	CallMatrices      []matrix.Matrix               `json:"call_matrices"`
-	PutMatrices       []matrix.Matrix               `json:"put_matrices"`
-	BullSpreadsATM    []bullspread.Spread            `json:"bull_spreads_atm"`
-	BullSpreadsOTM    []bullspread.Spread            `json:"bull_spreads_otm"`
-	PriceChart        []sourcearena.Candle           `json:"price_chart"`
-	Indicators        *sourcearena.TechnicalIndicators `json:"indicators,omitempty"`
-	SymbolRows        []indicators.SymbolRow         `json:"symbol_rows,omitempty"`
-	QueueCandidates   []market.QueueCandidate        `json:"queue_candidates,omitempty"`
-	BackfillInProgress bool                          `json:"backfill_in_progress,omitempty"`
-	BackfillProgress   BackfillProgress              `json:"backfill_progress,omitempty"`
-	Errors            []string                       `json:"errors,omitempty"`
+	GeneratedAt          time.Time                        `json:"generated_at"`
+	Underlying           sourcearena.SymbolQuote          `json:"underlying"`
+	HV                   hv.Result                        `json:"hv"`
+	HVFetch              HVFetch                          `json:"hv_fetch"`
+	Breadth              indicators.IndicatorResult       `json:"breadth"`
+	AdvanceDecline       indicators.IndicatorResult       `json:"advance_decline"`
+	DailyHistory         []DailyRow                       `json:"daily_history,omitempty"`
+	Opportunities        []arbitrage.Opportunity          `json:"opportunities"`
+	CoveredCalls         []coveredcall.CoveredCall        `json:"covered_calls"`
+	ImpliedVolatility    []ivcalc.IVResult                `json:"implied_volatility"`
+	CallMatrices         []matrix.Matrix                  `json:"call_matrices"`
+	PutMatrices          []matrix.Matrix                  `json:"put_matrices"`
+	BullSpreadsATM       []bullspread.Spread              `json:"bull_spreads_atm"`
+	BullSpreadsOTM       []bullspread.Spread              `json:"bull_spreads_otm"`
+	PriceChart           []sourcearena.Candle             `json:"price_chart"`
+	Indicators           *sourcearena.TechnicalIndicators `json:"indicators,omitempty"`
+	SymbolRows           []indicators.SymbolRow           `json:"symbol_rows,omitempty"`
+	SymbolHalts          []market.SymbolHalt              `json:"symbol_halts,omitempty"`
+	SymbolHaltEvents     []market.SymbolHaltEvent         `json:"symbol_halt_events,omitempty"`
+	SymbolHaltsCheckedAt time.Time                        `json:"symbol_halts_checked_at,omitempty"`
+	QueueCandidates      []market.QueueCandidate          `json:"queue_candidates,omitempty"`
+	BackfillInProgress   bool                             `json:"backfill_in_progress,omitempty"`
+	BackfillProgress     BackfillProgress                 `json:"backfill_progress,omitempty"`
+	Errors               []string                         `json:"errors,omitempty"`
 }
 
-func NewService(cfg *config.Config, client *sourcearena.Client, marketStore market.DailyStore, symbolStore market.SymbolSnapshotStore, registryStore market.SymbolRegistryStore, alertEngine *alerts.Engine) *Service {
+func NewService(cfg *config.Config, client *sourcearena.Client, marketStore market.DailyStore, symbolStore market.SymbolSnapshotStore, registryStore market.SymbolRegistryStore, haltStore market.SymbolHaltStore, alertEngine *alerts.Engine) *Service {
 	matrixRules, _ := matrixalerts.LoadRules(cfg.MatrixAlertsFile)
 	return &Service{
-		cfg:           cfg,
-		client:        client,
-		marketStore:   marketStore,
-		symbolStore:   symbolStore,
-		registryStore: registryStore,
+		cfg:               cfg,
+		client:            client,
+		marketStore:       marketStore,
+		symbolStore:       symbolStore,
+		registryStore:     registryStore,
+		haltStore:         haltStore,
+		bourseCrawler:     boursecrawl.NewClient(cfg.BourseCrawlURLTemplate, cfg.BourseCrawlUserAgent),
 		pairEngine:        pairs.NewEngine(),
 		arbEngine:         arbitrage.NewEngine(),
 		coveredCallEngine: coveredcall.NewEngine(),
@@ -119,9 +127,9 @@ func NewService(cfg *config.Config, client *sourcearena.Client, marketStore mark
 			Low:  cfg.Alerts.AdvanceLowThreshold,
 		}),
 		bullSpreadEngine: bullspread.NewEngine(),
-		matrix:      matrix.NewEngine(),
-		matrixRules: matrixRules,
-		alerts:      alertEngine,
+		matrix:           matrix.NewEngine(),
+		matrixRules:      matrixRules,
+		alerts:           alertEngine,
 	}
 }
 
@@ -389,6 +397,20 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 	if s.symbolStore != nil {
 		if _, symRows, err := s.symbolStore.LatestSymbolSnapshot(ctx); err == nil {
 			snap.SymbolRows = symRows
+		}
+	}
+	if s.haltStore != nil {
+		checkedAt, halts, err := s.haltStore.LatestSymbolHalts(ctx)
+		if err == nil {
+			snap.SymbolHalts = halts
+			snap.SymbolHaltsCheckedAt = checkedAt
+		} else {
+			snap.Errors = append(snap.Errors, fmt.Sprintf("symbol halts: %v", err))
+		}
+		if events, eventsErr := s.haltStore.RecentSymbolHaltEvents(ctx, 100); eventsErr == nil {
+			snap.SymbolHaltEvents = events
+		} else {
+			snap.Errors = append(snap.Errors, fmt.Sprintf("symbol halt events: %v", eventsErr))
 		}
 	}
 
