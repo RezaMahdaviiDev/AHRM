@@ -2,7 +2,10 @@ package market
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -80,6 +83,20 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS symbol_halt_sync (
 		id         INTEGER PRIMARY KEY CHECK (id = 1),
 		checked_at TEXT NOT NULL DEFAULT ''
+	)`)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS symbol_halt_events (
+		id          TEXT PRIMARY KEY,
+		symbol      TEXT NOT NULL,
+		event_type  TEXT NOT NULL,
+		reason      TEXT NOT NULL DEFAULT '',
+		occurred_at TEXT NOT NULL DEFAULT '',
+		source      TEXT NOT NULL DEFAULT '',
+		raw_message TEXT NOT NULL DEFAULT '',
+		seen_at     TEXT NOT NULL
 	)`)
 	if err != nil {
 		db.Close()
@@ -411,6 +428,93 @@ func (s *SQLiteStore) LatestSymbolHalts(ctx context.Context) (time.Time, []Symbo
 		halts = append(halts, halt)
 	}
 	return checkedAt, halts, rows.Err()
+}
+
+func (s *SQLiteStore) AppendSymbolHaltEvents(ctx context.Context, events []SymbolHaltEvent) error {
+	if len(events) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT OR IGNORE INTO symbol_halt_events (
+			id, symbol, event_type, reason, occurred_at, source, raw_message, seen_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	now := time.Now().UTC().Format("2006-01-02 15:04:05")
+	for _, event := range events {
+		if strings.TrimSpace(event.Symbol) == "" || strings.TrimSpace(event.EventType) == "" {
+			continue
+		}
+		key := hashEventKey(event)
+		if _, err = stmt.ExecContext(
+			ctx,
+			key,
+			event.Symbol,
+			event.EventType,
+			event.Reason,
+			event.OccurredAt,
+			event.Source,
+			event.RawMessage,
+			now,
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *SQLiteStore) RecentSymbolHaltEvents(ctx context.Context, limit int) ([]SymbolHaltEvent, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT symbol, event_type, reason, occurred_at, source, raw_message
+		FROM symbol_halt_events
+		ORDER BY seen_at DESC
+		LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events := make([]SymbolHaltEvent, 0, limit)
+	for rows.Next() {
+		var event SymbolHaltEvent
+		if err = rows.Scan(
+			&event.Symbol,
+			&event.EventType,
+			&event.Reason,
+			&event.OccurredAt,
+			&event.Source,
+			&event.RawMessage,
+		); err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+	return events, rows.Err()
+}
+
+func hashEventKey(event SymbolHaltEvent) string {
+	payload, _ := json.Marshal(map[string]string{
+		"symbol":      strings.TrimSpace(event.Symbol),
+		"event_type":  strings.TrimSpace(event.EventType),
+		"reason":      strings.TrimSpace(event.Reason),
+		"occurred_at": strings.TrimSpace(event.OccurredAt),
+		"source":      strings.TrimSpace(event.Source),
+		"raw_message": strings.TrimSpace(event.RawMessage),
+	})
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:])
 }
 
 func (s *SQLiteStore) Close() error {

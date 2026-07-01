@@ -9,6 +9,7 @@ import (
 
 	"ahrm/internal/alerts"
 	"ahrm/internal/arbitrage"
+	"ahrm/internal/boursecrawl"
 	"ahrm/internal/bullspread"
 	"ahrm/internal/config"
 	"ahrm/internal/coveredcall"
@@ -39,6 +40,7 @@ type Service struct {
 	symbolStore       market.SymbolSnapshotStore
 	registryStore     market.SymbolRegistryStore
 	haltStore         market.SymbolHaltStore
+	bourseCrawler     *boursecrawl.Client
 	backfilling       atomic.Bool
 	bfMu              sync.Mutex
 	bfProgress        BackfillProgress
@@ -93,6 +95,7 @@ type Snapshot struct {
 	Indicators           *sourcearena.TechnicalIndicators `json:"indicators,omitempty"`
 	SymbolRows           []indicators.SymbolRow           `json:"symbol_rows,omitempty"`
 	SymbolHalts          []market.SymbolHalt              `json:"symbol_halts,omitempty"`
+	SymbolHaltEvents     []market.SymbolHaltEvent         `json:"symbol_halt_events,omitempty"`
 	SymbolHaltsCheckedAt time.Time                        `json:"symbol_halts_checked_at,omitempty"`
 	QueueCandidates      []market.QueueCandidate          `json:"queue_candidates,omitempty"`
 	BackfillInProgress   bool                             `json:"backfill_in_progress,omitempty"`
@@ -109,6 +112,7 @@ func NewService(cfg *config.Config, client *sourcearena.Client, marketStore mark
 		symbolStore:       symbolStore,
 		registryStore:     registryStore,
 		haltStore:         haltStore,
+		bourseCrawler:     boursecrawl.NewClient(cfg.BourseCrawlURLTemplate, cfg.BourseCrawlUserAgent),
 		pairEngine:        pairs.NewEngine(),
 		arbEngine:         arbitrage.NewEngine(),
 		coveredCallEngine: coveredcall.NewEngine(),
@@ -402,6 +406,11 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 			snap.SymbolHaltsCheckedAt = checkedAt
 		} else {
 			snap.Errors = append(snap.Errors, fmt.Sprintf("symbol halts: %v", err))
+		}
+		if events, eventsErr := s.haltStore.RecentSymbolHaltEvents(ctx, 100); eventsErr == nil {
+			snap.SymbolHaltEvents = events
+		} else {
+			snap.Errors = append(snap.Errors, fmt.Sprintf("symbol halt events: %v", eventsErr))
 		}
 	}
 

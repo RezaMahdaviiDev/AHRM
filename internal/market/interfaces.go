@@ -34,7 +34,18 @@ type SymbolHalt struct {
 	SupervisorMessageAt string `json:"supervisor_message_at"`
 }
 
+type SymbolHaltEvent struct {
+	Symbol     string `json:"symbol"`
+	EventType  string `json:"event_type"`
+	Reason     string `json:"reason"`
+	OccurredAt string `json:"occurred_at"`
+	Source     string `json:"source"`
+	RawMessage string `json:"raw_message"`
+}
+
 type SymbolHaltStore interface {
 	ReplaceSymbolHalts(ctx context.Context, checkedAt time.Time, halts []SymbolHalt) error
 	LatestSymbolHalts(ctx context.Context) (checkedAt time.Time, halts []SymbolHalt, err error)
+	AppendSymbolHaltEvents(ctx context.Context, events []SymbolHaltEvent) error
+	RecentSymbolHaltEvents(ctx context.Context, limit int) ([]SymbolHaltEvent, error)
 }

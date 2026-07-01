@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ahrm/internal/alerts"
+	"ahrm/internal/boursecrawl"
 	"ahrm/internal/market"
 	"ahrm/internal/sourcearena"
 )
@@ -78,6 +79,7 @@ func (s *Service) syncSymbolHaltsOnce(ctx context.Context) {
 	latestHalts := latestMessagesBySymbol(supervisorMessages, isHaltSupervisorMessage)
 
 	halts := make([]market.SymbolHalt, 0, len(closedSymbols))
+	events := make([]market.SymbolHaltEvent, 0, len(closedSymbols)+len(supervisorMessages))
 	for _, item := range closedSymbols {
 		name := normalizeSymbol(item.Name)
 		if name == "" {
@@ -87,6 +89,16 @@ func (s *Service) syncSymbolHaltsOnce(ctx context.Context) {
 		reason := strings.TrimSpace(item.Message)
 		if reason == "" {
 			reason = strings.TrimSpace(latest.Message)
+		}
+		fallbackSource := "sourcearena"
+		if reason == "" {
+			if fallback, ok := s.fetchHaltReasonFromBourse(syncCtx, name); ok {
+				reason = fallback.Reason
+				if haltedAt := strings.TrimSpace(fallback.PublishedAt); haltedAt != "" {
+					item.HaltedAt = haltedAt
+				}
+				fallbackSource = "bourse-crawl"
+			}
 		}
 		haltedAt := strings.TrimSpace(item.HaltedAt)
 		if haltedAt == "" {
@@ -105,9 +117,19 @@ func (s *Service) syncSymbolHaltsOnce(ctx context.Context) {
 			SupervisorMessage:   strings.TrimSpace(latest.Message),
 			SupervisorMessageAt: strings.TrimSpace(latest.PublishedAt),
 		})
+		events = append(events, market.SymbolHaltEvent{
+			Symbol:     name,
+			EventType:  "halt",
+			Reason:     reason,
+			OccurredAt: haltedAt,
+			Source:     fallbackSource,
+			RawMessage: chooseFirstNonEmpty(item.Message, latest.Message),
+		})
 	}
+	events = append(events, supervisorEvents(supervisorMessages)...)
 	sort.Slice(halts, func(i, j int) bool { return halts[i].Name < halts[j].Name })
 	_ = s.haltStore.ReplaceSymbolHalts(syncCtx, time.Now().UTC(), halts)
+	_ = s.haltStore.AppendSymbolHaltEvents(syncCtx, events)
 }
 
 func (s *Service) checkReopenAnnouncements(ctx context.Context) {
@@ -131,6 +153,7 @@ func (s *Service) checkReopenAnnouncements(ctx context.Context) {
 		return
 	}
 	reopenMessages := latestMessagesBySymbol(messages, isReopenSupervisorMessage)
+	events := make([]market.SymbolHaltEvent, 0, len(reopenMessages))
 	for symbol, msg := range reopenMessages {
 		if _, exists := haltedSet[symbol]; !exists {
 			continue
@@ -140,7 +163,16 @@ func (s *Service) checkReopenAnnouncements(ctx context.Context) {
 			PublishedAt: msg.PublishedAt,
 			Message:     msg.Message,
 		})
+		events = append(events, market.SymbolHaltEvent{
+			Symbol:     symbol,
+			EventType:  "reopen",
+			Reason:     msg.Message,
+			OccurredAt: msg.PublishedAt,
+			Source:     "sourcearena",
+			RawMessage: msg.Message,
+		})
 	}
+	_ = s.haltStore.AppendSymbolHaltEvents(checkCtx, events)
 }
 
 func latestMessagesBySymbol(messages []sourcearena.SupervisorMessage, keep func(string) bool) map[string]sourcearena.SupervisorMessage {
@@ -215,4 +247,53 @@ func isTehranMarketHours() bool {
 	afterOpen := hour > tehranMarketOpenHour || (hour == tehranMarketOpenHour && minute >= tehranMarketOpenMinute)
 	beforeClose := hour < tehranMarketCloseHour || (hour == tehranMarketCloseHour && minute <= tehranMarketCloseMinute)
 	return afterOpen && beforeClose
+}
+
+func (s *Service) fetchHaltReasonFromBourse(ctx context.Context, symbol string) (boursecrawl.Notice, bool) {
+	if s.bourseCrawler == nil || !s.bourseCrawler.Enabled() {
+		return boursecrawl.Notice{}, false
+	}
+	notice, err := s.bourseCrawler.FetchLatestNotice(ctx, symbol)
+	if err != nil {
+		return boursecrawl.Notice{}, false
+	}
+	if strings.TrimSpace(notice.Reason) == "" {
+		return boursecrawl.Notice{}, false
+	}
+	return notice, true
+}
+
+func supervisorEvents(messages []sourcearena.SupervisorMessage) []market.SymbolHaltEvent {
+	events := make([]market.SymbolHaltEvent, 0, len(messages))
+	for _, msg := range messages {
+		symbol := normalizeSymbol(msg.Symbol)
+		if symbol == "" {
+			continue
+		}
+		eventType := "supervisor"
+		if isHaltSupervisorMessage(msg.Message) {
+			eventType = "halt"
+		} else if isReopenSupervisorMessage(msg.Message) {
+			eventType = "reopen"
+		}
+		events = append(events, market.SymbolHaltEvent{
+			Symbol:     symbol,
+			EventType:  eventType,
+			Reason:     msg.Message,
+			OccurredAt: msg.PublishedAt,
+			Source:     "sourcearena",
+			RawMessage: msg.Message,
+		})
+	}
+	return events
+}
+
+func chooseFirstNonEmpty(values ...string) string {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

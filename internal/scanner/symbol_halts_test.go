@@ -50,3 +50,23 @@ func TestLatestMessagesBySymbol(t *testing.T) {
 		t.Fatalf("message=%q", got["خساپا"].Message)
 	}
 }
+
+func TestSupervisorEventsBuildTypes(t *testing.T) {
+	events := supervisorEvents([]sourcearena.SupervisorMessage{
+		{Symbol: "خساپا", Message: "نماد متوقف شد"},
+		{Symbol: "فولاد", Message: "آغاز بازگشایی نماد"},
+		{Symbol: "شستا", Message: "پیام ناظر عمومی"},
+	})
+	if len(events) != 3 {
+		t.Fatalf("events=%+v", events)
+	}
+	if events[0].EventType != "halt" {
+		t.Fatalf("expected halt, got %q", events[0].EventType)
+	}
+	if events[1].EventType != "reopen" {
+		t.Fatalf("expected reopen, got %q", events[1].EventType)
+	}
+	if events[2].EventType != "supervisor" {
+		t.Fatalf("expected supervisor, got %q", events[2].EventType)
+	}
+}

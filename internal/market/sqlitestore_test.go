@@ -43,3 +43,45 @@ func TestSQLiteStoreSymbolHaltsRoundTrip(t *testing.T) {
 		t.Fatalf("halts=%+v", gotHalts)
 	}
 }
+
+func TestSQLiteStoreSymbolHaltEventsRoundTrip(t *testing.T) {
+	store, err := market.NewSQLiteStore(filepath.Join(t.TempDir(), "market.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	events := []market.SymbolHaltEvent{
+		{
+			Symbol:     "خساپا",
+			EventType:  "halt",
+			Reason:     "افشای اطلاعات با اهمیت",
+			OccurredAt: "1405/04/10 09:05",
+			Source:     "sourcearena",
+			RawMessage: "نماد متوقف شد",
+		},
+		{
+			Symbol:     "خساپا",
+			EventType:  "reopen",
+			Reason:     "آغاز بازگشایی",
+			OccurredAt: "1405/04/10 10:05",
+			Source:     "sourcearena",
+			RawMessage: "آغاز بازگشایی نماد",
+		},
+	}
+	if err := store.AppendSymbolHaltEvents(context.Background(), events); err != nil {
+		t.Fatal(err)
+	}
+	// Duplicate insert should be ignored (same hash key).
+	if err := store.AppendSymbolHaltEvents(context.Background(), events[:1]); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := store.RecentSymbolHaltEvents(context.Background(), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("events=%+v", got)
+	}
+}

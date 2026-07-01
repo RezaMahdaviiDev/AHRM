@@ -167,6 +167,11 @@ A Supervisor Message explicitly announcing the start of reopening flow (for exam
 pre-open/order-entry or auction start).
 _Avoid_: any generic "update" message that does not start reopening
 
+**Halt Event**:
+A persisted historical record of one halt-related lifecycle message (halt, reopening, or
+other supervisor state transition) for a symbol.
+_Avoid_: treating the current halt snapshot as history (snapshot = latest state only)
+
 ## Aggregation & alerting
 
 **Snapshot**:

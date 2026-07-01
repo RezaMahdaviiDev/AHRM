@@ -65,6 +65,35 @@
       </tbody>
     </table>
 
+    <div class="card" style="margin-top:1rem">
+      <strong>آرشیو رویدادهای ناظر (آخرین {{len .Snapshot.SymbolHaltEvents}} مورد)</strong>
+      <p class="muted">این آرشیو در تمام روز (حتی خارج از ساعت بازار) به‌روزرسانی و نگهداری می‌شود.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>نماد</th>
+            <th>نوع رویداد</th>
+            <th>علت/متن</th>
+            <th>زمان رویداد</th>
+            <th>منبع</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Snapshot.SymbolHaltEvents}}
+          <tr>
+            <td>{{.Symbol}}</td>
+            <td>{{.EventType}}</td>
+            <td style="text-align:right">{{if .Reason}}{{.Reason}}{{else}}—{{end}}</td>
+            <td>{{if .OccurredAt}}{{.OccurredAt}}{{else}}—{{end}}</td>
+            <td>{{if .Source}}{{.Source}}{{else}}—{{end}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="5">هنوز رویدادی در آرشیو ثبت نشده است.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+
     {{if .Snapshot.Errors}}
     <div class="card">
       <strong>خطاها</strong>
