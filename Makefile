@@ -1,4 +1,4 @@
-.PHONY: run test test-integration build
+.PHONY: run test test-integration build db-up db-down db-psql
 
 run:
 	go run ./cmd/server
@@ -11,3 +11,14 @@ test-integration:
 
 build:
 	go build -o bin/server ./cmd/server
+
+# --- Local development database (PostgreSQL via Docker) ---
+
+db-up:
+	docker compose up -d postgres
+
+db-down:
+	docker compose down
+
+db-psql:
+	docker compose exec postgres psql -U ahrm -d ahrm
