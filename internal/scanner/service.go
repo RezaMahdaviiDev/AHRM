@@ -33,25 +33,25 @@ type BackfillProgress struct {
 }
 
 type Service struct {
-	cfg           *config.Config
-	client        *sourcearena.Client
-	marketStore   market.DailyStore
-	symbolStore   market.SymbolSnapshotStore
-	registryStore market.SymbolRegistryStore
-	backfilling     atomic.Bool
-	bfMu            sync.Mutex
-	bfProgress      BackfillProgress
+	cfg               *config.Config
+	client            *sourcearena.Client
+	marketStore       market.DailyStore
+	symbolStore       market.SymbolSnapshotStore
+	registryStore     market.SymbolRegistryStore
+	backfilling       atomic.Bool
+	bfMu              sync.Mutex
+	bfProgress        BackfillProgress
 	pairEngine        *pairs.Engine
 	arbEngine         *arbitrage.Engine
 	coveredCallEngine *coveredcall.Engine
 	ivEngine          *ivcalc.Engine
 	hvEngine          *hv.Engine
 	bullSpreadEngine  *bullspread.Engine
-	breadth    *indicators.BreadthEngine
-	advance    *indicators.AdvanceDeclineEngine
-	matrix      *matrix.Engine
-	matrixRules []matrixalerts.Rule
-	alerts      *alerts.Engine
+	breadth           *indicators.BreadthEngine
+	advance           *indicators.AdvanceDeclineEngine
+	matrix            *matrix.Engine
+	matrixRules       []matrixalerts.Rule
+	alerts            *alerts.Engine
 }
 
 type HVFetch struct {
@@ -74,37 +74,37 @@ type DailyRow struct {
 }
 
 type Snapshot struct {
-	GeneratedAt   time.Time                    `json:"generated_at"`
-	Underlying    sourcearena.SymbolQuote      `json:"underlying"`
-	HV            hv.Result                    `json:"hv"`
-	HVFetch       HVFetch                      `json:"hv_fetch"`
-	Breadth       indicators.IndicatorResult   `json:"breadth"`
-	AdvanceDecline indicators.IndicatorResult  `json:"advance_decline"`
-	DailyHistory      []DailyRow                    `json:"daily_history,omitempty"`
-	Opportunities     []arbitrage.Opportunity       `json:"opportunities"`
-	CoveredCalls      []coveredcall.CoveredCall     `json:"covered_calls"`
-	ImpliedVolatility []ivcalc.IVResult             `json:"implied_volatility"`
-	CallMatrices      []matrix.Matrix               `json:"call_matrices"`
-	PutMatrices       []matrix.Matrix               `json:"put_matrices"`
-	BullSpreadsATM    []bullspread.Spread            `json:"bull_spreads_atm"`
-	BullSpreadsOTM    []bullspread.Spread            `json:"bull_spreads_otm"`
-	PriceChart        []sourcearena.Candle           `json:"price_chart"`
-	Indicators        *sourcearena.TechnicalIndicators `json:"indicators,omitempty"`
-	SymbolRows        []indicators.SymbolRow         `json:"symbol_rows,omitempty"`
-	QueueCandidates   []market.QueueCandidate        `json:"queue_candidates,omitempty"`
-	BackfillInProgress bool                          `json:"backfill_in_progress,omitempty"`
-	BackfillProgress   BackfillProgress              `json:"backfill_progress,omitempty"`
-	Errors            []string                       `json:"errors,omitempty"`
+	GeneratedAt        time.Time                        `json:"generated_at"`
+	Underlying         sourcearena.SymbolQuote          `json:"underlying"`
+	HV                 hv.Result                        `json:"hv"`
+	HVFetch            HVFetch                          `json:"hv_fetch"`
+	Breadth            indicators.IndicatorResult       `json:"breadth"`
+	AdvanceDecline     indicators.IndicatorResult       `json:"advance_decline"`
+	DailyHistory       []DailyRow                       `json:"daily_history,omitempty"`
+	Opportunities      []arbitrage.Opportunity          `json:"opportunities"`
+	CoveredCalls       []coveredcall.CoveredCall        `json:"covered_calls"`
+	ImpliedVolatility  []ivcalc.IVResult                `json:"implied_volatility"`
+	CallMatrices       []matrix.Matrix                  `json:"call_matrices"`
+	PutMatrices        []matrix.Matrix                  `json:"put_matrices"`
+	BullSpreadsATM     []bullspread.Spread              `json:"bull_spreads_atm"`
+	BullSpreadsOTM     []bullspread.Spread              `json:"bull_spreads_otm"`
+	PriceChart         []sourcearena.Candle             `json:"price_chart"`
+	Indicators         *sourcearena.TechnicalIndicators `json:"indicators,omitempty"`
+	SymbolRows         []indicators.SymbolRow           `json:"symbol_rows,omitempty"`
+	QueueCandidates    []market.QueueCandidate          `json:"queue_candidates,omitempty"`
+	BackfillInProgress bool                             `json:"backfill_in_progress,omitempty"`
+	BackfillProgress   BackfillProgress                 `json:"backfill_progress,omitempty"`
+	Errors             []string                         `json:"errors,omitempty"`
 }
 
 func NewService(cfg *config.Config, client *sourcearena.Client, marketStore market.DailyStore, symbolStore market.SymbolSnapshotStore, registryStore market.SymbolRegistryStore, alertEngine *alerts.Engine) *Service {
 	matrixRules, _ := matrixalerts.LoadRules(cfg.MatrixAlertsFile)
 	return &Service{
-		cfg:           cfg,
-		client:        client,
-		marketStore:   marketStore,
-		symbolStore:   symbolStore,
-		registryStore: registryStore,
+		cfg:               cfg,
+		client:            client,
+		marketStore:       marketStore,
+		symbolStore:       symbolStore,
+		registryStore:     registryStore,
 		pairEngine:        pairs.NewEngine(),
 		arbEngine:         arbitrage.NewEngine(),
 		coveredCallEngine: coveredcall.NewEngine(),
@@ -119,9 +119,9 @@ func NewService(cfg *config.Config, client *sourcearena.Client, marketStore mark
 			Low:  cfg.Alerts.AdvanceLowThreshold,
 		}),
 		bullSpreadEngine: bullspread.NewEngine(),
-		matrix:      matrix.NewEngine(),
-		matrixRules: matrixRules,
-		alerts:      alertEngine,
+		matrix:           matrix.NewEngine(),
+		matrixRules:      matrixRules,
+		alerts:           alertEngine,
 	}
 }
 
@@ -190,17 +190,22 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		}
 	}
 
+	var today indicators.DailyMarket
+	hasToday := len(symbols) > 0
+	if hasToday {
+		today = market.ClassifyDay(symbols)
+	}
+	isHolidaySnapshot := hasToday && today.Total > 0 && len(history) > 0 &&
+		history[len(history)-1].Positive == today.Positive &&
+		history[len(history)-1].Negative == today.Negative &&
+		history[len(history)-1].Total == today.Total
+
 	// Record today's breadth snapshot after 13:00 Tehran time (post-session data).
 	// Skip when Total==0 (market fully closed) or when stats exactly match the most-recent
 	// DB record — SourceArena caches the last trading day's snapshot on holidays, so
 	// identical stats is a reliable signal that no trading occurred today.
-	if isTehranAfter(13, 0) && s.marketStore != nil && len(symbols) > 0 {
-		today := market.ClassifyDay(symbols)
-		stale := today.Total > 0 && len(history) > 0 &&
-			history[len(history)-1].Positive == today.Positive &&
-			history[len(history)-1].Negative == today.Negative &&
-			history[len(history)-1].Total == today.Total
-		if today.Total > 0 && !stale {
+	if isTehranAfter(13, 0) && s.marketStore != nil && hasToday {
+		if today.Total > 0 && !isHolidaySnapshot {
 			_ = s.marketStore.UpsertToday(ctx, today)
 			if s.symbolStore != nil {
 				symRows := market.SymbolRows(symbols)
@@ -296,7 +301,7 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 			} else {
 				snap.CoveredCalls = covered
 				for _, cc := range covered {
-					if s.alerts != nil {
+					if s.alerts != nil && !isHolidaySnapshot {
 						_, _ = s.alerts.MaybeSendCoveredCallROI(ctx, alerts.CoveredCallAlertInput{
 							Symbol:       cc.Symbol,
 							Expiry:       cc.Expiry,
@@ -323,7 +328,7 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 			opps, _ := s.arbEngine.CalculateAll(matched, snap.Underlying.ClosePrice)
 			snap.Opportunities = opps
 			for _, opp := range opps {
-				if s.alerts != nil {
+				if s.alerts != nil && !isHolidaySnapshot {
 					_, _ = s.alerts.MaybeSendArbitrage(ctx, alerts.ArbitrageAlertInput{
 						Symbol: opp.Symbol, Expiry: opp.Expiry, Strike: opp.Strike, ReturnPct: opp.ReturnPct,
 					})
@@ -344,7 +349,7 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		if snap.Underlying.ClosePrice > 0 {
 			snap.BullSpreadsATM = s.bullSpreadEngine.CalculateAll(options, snap.Underlying.ClosePrice, bullspread.ATM)
 			snap.BullSpreadsOTM = s.bullSpreadEngine.CalculateAll(options, snap.Underlying.ClosePrice, bullspread.OTM)
-			if s.alerts != nil {
+			if s.alerts != nil && !isHolidaySnapshot {
 				for _, sp := range snap.BullSpreadsATM {
 					_, _ = s.alerts.MaybeSendBullSpreadBale(ctx, alerts.BullSpreadAlertInput{
 						K1Symbol: sp.K1Symbol, K2Symbol: sp.K2Symbol,
@@ -371,13 +376,13 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 				continue
 			}
 			diff, triggered := rule.Evaluate(priceA, priceB)
-			if triggered && s.alerts != nil {
+			if triggered && s.alerts != nil && !isHolidaySnapshot {
 				_, _ = s.alerts.MaybeSendMatrixAlert(ctx, rule.ID, diff, rule.Message)
 			}
 		}
 	}
 
-	if s.alerts != nil {
+	if s.alerts != nil && !isHolidaySnapshot {
 		if snap.Breadth.AlertState != "" {
 			_, _ = s.alerts.MaybeSendBreadth(ctx, snap.Breadth.Average10Day, snap.Breadth.AlertState)
 		}
