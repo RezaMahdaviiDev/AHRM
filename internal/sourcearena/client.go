@@ -98,6 +98,22 @@ func (c *Client) FetchAllSymbols(ctx context.Context) ([]SymbolQuote, error) {
 	return decodeSymbols(raw)
 }
 
+func (c *Client) FetchClosedSymbols(ctx context.Context) ([]ClosedSymbol, error) {
+	raw, err := c.getMarket(ctx, c.marketURL("closed_symbols"), "closed_symbols")
+	if err != nil {
+		return nil, err
+	}
+	return decodeClosedSymbols(raw)
+}
+
+func (c *Client) FetchSupervisorMessages(ctx context.Context) ([]SupervisorMessage, error) {
+	raw, err := c.getMarket(ctx, c.marketURL("inspect=all"), "inspect")
+	if err != nil {
+		return nil, err
+	}
+	return decodeSupervisorMessages(raw)
+}
+
 func (c *Client) FetchSymbol(ctx context.Context, symbol string) (SymbolQuote, error) {
 	raw, err := c.getMarket(ctx, c.marketURL("name="+url.QueryEscape(symbol)), "symbol")
 	if err != nil {

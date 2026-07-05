@@ -24,11 +24,12 @@ func loadTehranLocation() *time.Location {
 }
 
 type pageData struct {
-	Title             string
-	Snapshot          scanner.Snapshot
-	RefreshSeconds    int
-	RefreshMinutes    int
-	LastUpdatedTehran string
+	Title                      string
+	Snapshot                   scanner.Snapshot
+	RefreshSeconds             int
+	RefreshMinutes             int
+	LastUpdatedTehran          string
+	SymbolHaltsCheckedAtTehran string
 }
 
 func (s *Server) registerPages(mux *http.ServeMux) {
@@ -40,6 +41,7 @@ func (s *Server) registerPages(mux *http.ServeMux) {
 	mux.HandleFunc("GET /covered-call", s.pageHandler("covered-call.html", "Covered Call"))
 	mux.HandleFunc("GET /matrix", s.pageHandler("matrix.html", "Matrix"))
 	mux.HandleFunc("GET /bull-spread", s.pageHandler("bull-spread.html", "Bull Call Spread"))
+	mux.HandleFunc("GET /halts", s.pageHandler("halts.html", "Symbol Halts"))
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dashboard", http.StatusFound)
 	})
@@ -48,9 +50,11 @@ func (s *Server) registerPages(mux *http.ServeMux) {
 func (s *Server) initTemplates() {
 	s.tplOnce.Do(func() {
 		funcs := template.FuncMap{
-			"mul100":   func(a int) int { return a * 100 },
-			"divInt":   func(a, b int) int {
-				if b == 0 { return 0 }
+			"mul100": func(a int) int { return a * 100 },
+			"divInt": func(a, b int) int {
+				if b == 0 {
+					return 0
+				}
 				return a / b
 			},
 			"toJalali": toJalali,
@@ -66,11 +70,12 @@ func (s *Server) pageHandler(name, title string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		snap := s.getSnapshot(r.Context())
 		data := pageData{
-			Title:             title,
-			Snapshot:          snap,
-			RefreshSeconds:    s.refreshSeconds,
-			RefreshMinutes:    (s.refreshSeconds + 59) / 60,
-			LastUpdatedTehran: formatTehran(snap.GeneratedAt),
+			Title:                      title,
+			Snapshot:                   snap,
+			RefreshSeconds:             s.refreshSeconds,
+			RefreshMinutes:             (s.refreshSeconds + 59) / 60,
+			LastUpdatedTehran:          formatTehran(snap.GeneratedAt),
+			SymbolHaltsCheckedAtTehran: formatTehran(snap.SymbolHaltsCheckedAt),
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if s.templates == nil {

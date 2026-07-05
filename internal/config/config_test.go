@@ -71,3 +71,12 @@ func TestValidateBaleOKWhenBothSet(t *testing.T) {
 		t.Fatalf("Validate() error = %v", err)
 	}
 }
+
+func TestValidateBourseCrawlTemplateRequiresSymbolPlaceholder(t *testing.T) {
+	cfg := &config.Config{
+		BourseCrawlURLTemplate: "https://example.com/notice",
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected validation error for missing {symbol}")
+	}
+}

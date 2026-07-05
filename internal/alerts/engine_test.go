@@ -72,3 +72,27 @@ func TestMatrixAlertDuplicateProtection(t *testing.T) {
 		t.Fatalf("messages=%d", len(sender.messages))
 	}
 }
+
+func TestSymbolReopenDuplicateProtection(t *testing.T) {
+	sender := &fakeSender{}
+	engine := alerts.NewEngine(alerts.Config{}, sender, alerts.NewMemStore())
+	input := alerts.SymbolReopenAlertInput{
+		Symbol:      "خساپا",
+		PublishedAt: "1405/04/01 09:15",
+		Message:     "آغاز بازگشایی نماد",
+	}
+	sent, err := engine.MaybeSendSymbolReopen(context.Background(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sent {
+		t.Fatal("expected alert sent")
+	}
+	sent, err = engine.MaybeSendSymbolReopen(context.Background(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sent {
+		t.Fatal("expected duplicate suppressed")
+	}
+}

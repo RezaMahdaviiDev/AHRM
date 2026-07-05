@@ -52,7 +52,7 @@ func TestRefreshWithMockAPI(t *testing.T) {
 
 	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "t"}, srv.URL, srv.URL, sourcearena.NopRawStore{})
 	cfg := &config.Config{}
-	svc := scanner.NewService(cfg, client, nil, nil, nil, nil)
+	svc := scanner.NewService(cfg, client, nil, nil, nil, nil, nil)
 	snap, err := svc.Refresh(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -159,7 +159,7 @@ func TestRefreshSkipsAlertsOnHolidaySnapshot(t *testing.T) {
 	store := &holidayDailyStore{
 		history: []indicators.DailyMarket{{Date: "2026-07-02", Positive: 1, Negative: 1, Total: 2}},
 	}
-	svc := scanner.NewService(cfg, client, store, nil, nil, alertEngine)
+	svc := scanner.NewService(cfg, client, store, nil, nil, nil, alertEngine)
 
 	if _, err := svc.Refresh(context.Background()); err != nil {
 		t.Fatal(err)

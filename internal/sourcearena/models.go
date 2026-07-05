@@ -3,6 +3,7 @@ package sourcearena
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -55,22 +56,22 @@ type symbolWire struct {
 }
 
 type Option struct {
-	Name                   string  `json:"name"`
-	ClosePrice             float64 `json:"close_price"`
-	ClosePriceChangePct    float64 `json:"close_price_change_percent"`
-	StrikePrice            float64 `json:"emal_price"`
-	ExpiryDate             string  `json:"to_date"`
-	BasisName              string  `json:"basis_name"`
-	BasisPricePercent      float64 `json:"basis_price_percent"`
-	OpenPosition           float64 `json:"op"`
-	SellRow1Price          float64 `json:"1_sell_price"`
-	SellRow1Volume         float64 `json:"1_sell_volume"`
-	BuyRow1Price           float64 `json:"1_buy_price"`
-	BuyRow1Volume          float64 `json:"1_buy_volume"`
-	TradeValue             float64 `json:"trade_value"`
-	TradeVolume            float64 `json:"trade_volume"`
-	LowestPrice            float64 `json:"lowest_price"`
-	HighestPrice           float64 `json:"highest_price"`
+	Name                string  `json:"name"`
+	ClosePrice          float64 `json:"close_price"`
+	ClosePriceChangePct float64 `json:"close_price_change_percent"`
+	StrikePrice         float64 `json:"emal_price"`
+	ExpiryDate          string  `json:"to_date"`
+	BasisName           string  `json:"basis_name"`
+	BasisPricePercent   float64 `json:"basis_price_percent"`
+	OpenPosition        float64 `json:"op"`
+	SellRow1Price       float64 `json:"1_sell_price"`
+	SellRow1Volume      float64 `json:"1_sell_volume"`
+	BuyRow1Price        float64 `json:"1_buy_price"`
+	BuyRow1Volume       float64 `json:"1_buy_volume"`
+	TradeValue          float64 `json:"trade_value"`
+	TradeVolume         float64 `json:"trade_volume"`
+	LowestPrice         float64 `json:"lowest_price"`
+	HighestPrice        float64 `json:"highest_price"`
 }
 
 type SymbolQuote struct {
@@ -87,6 +88,19 @@ type SymbolQuote struct {
 	SellRow1Volume      float64 `json:"1_sell_volume"`
 	HighestPrice        float64 `json:"highest_price"`
 	LowestPrice         float64 `json:"lowest_price"`
+}
+
+type ClosedSymbol struct {
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	HaltedAt string `json:"halted_at"`
+	Message  string `json:"message"`
+}
+
+type SupervisorMessage struct {
+	Symbol      string `json:"symbol"`
+	Message     string `json:"message"`
+	PublishedAt string `json:"published_at"`
 }
 
 type Candle struct {
@@ -183,6 +197,55 @@ func decodeCandles(raw json.RawMessage) ([]Candle, error) {
 	return nil, fmt.Errorf("decode candles: unexpected payload")
 }
 
+func decodeClosedSymbols(raw json.RawMessage) ([]ClosedSymbol, error) {
+	objects, err := decodeObjectList(raw)
+	if err != nil {
+		return nil, fmt.Errorf("decode closed symbols: %w", err)
+	}
+	out := make([]ClosedSymbol, 0, len(objects))
+	for _, item := range objects {
+		name := stringField(item, "name", "symbol", "namad", "symbol_name", "ticker")
+		if name == "" {
+			continue
+		}
+		out = append(out, ClosedSymbol{
+			Name:     name,
+			Status:   stringField(item, "status", "state", "symbol_status"),
+			HaltedAt: stringField(item, "halt_time", "stopped_at", "stop_time", "time", "date", "datetime", "updated_at"),
+			Message:  stringField(item, "message", "reason", "desc", "description", "title", "text"),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
+func decodeSupervisorMessages(raw json.RawMessage) ([]SupervisorMessage, error) {
+	objects, err := decodeObjectList(raw)
+	if err != nil {
+		return nil, fmt.Errorf("decode supervisor messages: %w", err)
+	}
+	out := make([]SupervisorMessage, 0, len(objects))
+	for _, item := range objects {
+		symbol := stringField(item, "symbol", "name", "namad", "symbol_name", "ticker")
+		message := stringField(item, "message", "msg", "text", "desc", "description", "body")
+		title := stringField(item, "title", "subject", "header")
+		if message == "" {
+			message = title
+		} else if title != "" && !strings.Contains(message, title) {
+			message = title + " — " + message
+		}
+		if symbol == "" || message == "" {
+			continue
+		}
+		out = append(out, SupervisorMessage{
+			Symbol:      symbol,
+			Message:     message,
+			PublishedAt: stringField(item, "published_at", "publish_at", "created_at", "date", "datetime", "time", "updated_at"),
+		})
+	}
+	return out, nil
+}
+
 func wiresToOptions(wires []optionWire) []Option {
 	out := make([]Option, 0, len(wires))
 	for _, w := range wires {
@@ -266,6 +329,95 @@ func parseFlexibleFloat(raw json.RawMessage) (float64, error) {
 	}
 	s = strings.TrimSpace(strings.TrimSuffix(s, "%"))
 	return strconv.ParseFloat(s, 64)
+}
+
+func decodeObjectList(raw json.RawMessage) ([]map[string]any, error) {
+	var list []map[string]any
+	if err := json.Unmarshal(raw, &list); err == nil {
+		return list, nil
+	}
+	var wrapped map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &wrapped); err != nil {
+		return nil, fmt.Errorf("unexpected payload: %w", err)
+	}
+	for _, key := range []string{"data", "results", "items", "list"} {
+		payload, ok := wrapped[key]
+		if !ok {
+			continue
+		}
+		if err := json.Unmarshal(payload, &list); err == nil {
+			return list, nil
+		}
+		var single map[string]any
+		if err := json.Unmarshal(payload, &single); err == nil {
+			if nested := flattenObjectValues(single); len(nested) > 0 {
+				return nested, nil
+			}
+			return []map[string]any{single}, nil
+		}
+	}
+	var single map[string]any
+	if err := json.Unmarshal(raw, &single); err == nil {
+		if nested := flattenObjectValues(single); len(nested) > 0 {
+			return nested, nil
+		}
+		return []map[string]any{single}, nil
+	}
+	if msg, ok := wrapped["Error"]; ok {
+		return nil, NewAPIError("sourcearena", 0, strings.Trim(string(msg), `"`))
+	}
+	return nil, fmt.Errorf("unexpected payload")
+}
+
+func flattenObjectValues(item map[string]any) []map[string]any {
+	out := make([]map[string]any, 0, len(item))
+	for key, raw := range item {
+		child, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, exists := child["name"]; !exists {
+			child["name"] = key
+		}
+		out = append(out, child)
+	}
+	if len(out) == len(item) && len(out) > 0 {
+		return out
+	}
+	return nil
+}
+
+func stringField(item map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if value, ok := item[key]; ok {
+			if txt := strings.TrimSpace(toString(value)); txt != "" {
+				return txt
+			}
+		}
+	}
+	return ""
+}
+
+func toString(v any) string {
+	if v == nil {
+		return ""
+	}
+	switch value := v.(type) {
+	case string:
+		return value
+	case float64:
+		return strconv.FormatFloat(value, 'f', -1, 64)
+	case float32:
+		return strconv.FormatFloat(float64(value), 'f', -1, 64)
+	case int:
+		return strconv.Itoa(value)
+	case int64:
+		return strconv.FormatInt(value, 10)
+	case json.Number:
+		return value.String()
+	default:
+		return fmt.Sprintf("%v", value)
+	}
 }
 
 // TechnicalIndicators is the response from the all_indicators endpoint.

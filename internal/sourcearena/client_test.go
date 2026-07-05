@@ -167,3 +167,70 @@ func TestFetchCandlesCustomType(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestClientFetchClosedSymbols(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := r.URL.Query()["closed_symbols"]; !ok {
+			t.Fatalf("expected closed_symbols query, got %v", r.URL.Query())
+		}
+		if got := r.URL.Query().Get("token"); got != "test-token" {
+			t.Fatalf("token=%q", got)
+		}
+		_, _ = w.Write([]byte(`[{"name":"خساپا","status":"halted"}]`))
+	}))
+	defer srv.Close()
+
+	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "test-token"}, srv.URL, srv.URL, sourcearena.NopRawStore{})
+	items, err := client.FetchClosedSymbols(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Name != "خساپا" {
+		t.Fatalf("items=%+v", items)
+	}
+}
+
+func TestClientFetchSupervisorMessages(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("inspect"); got != "all" {
+			t.Fatalf("inspect=%q query=%v", got, r.URL.Query())
+		}
+		if got := r.URL.Query().Get("token"); got != "test-token" {
+			t.Fatalf("token=%q", got)
+		}
+		_, _ = w.Write([]byte(`[{"name":"خساپا","title":"ناظر","message":"آغاز بازگشایی","date":"1405/04/01 09:15"}]`))
+	}))
+	defer srv.Close()
+
+	client := sourcearena.NewTestClient(config.SourceArenaConfig{APIToken: "test-token"}, srv.URL, srv.URL, sourcearena.NopRawStore{})
+	items, err := client.FetchSupervisorMessages(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Symbol != "خساپا" {
+		t.Fatalf("items=%+v", items)
+	}
+}
+
+func TestDecodeClosedSymbolsWrappedData(t *testing.T) {
+	items, err := sourcearena.DecodeClosedSymbolsForTest([]byte(`{"data":[{"name":"فولاد","reason":"افشای اطلاعات"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Name != "فولاد" {
+		t.Fatalf("items=%+v", items)
+	}
+}
+
+func TestDecodeSupervisorMessagesWrappedData(t *testing.T) {
+	items, err := sourcearena.DecodeSupervisorMessagesForTest([]byte(`{"results":[{"symbol":"شستا","title":"پیام ناظر","text":"نماد متوقف شد","time":"09:05"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Symbol != "شستا" {
+		t.Fatalf("items=%+v", items)
+	}
+	if items[0].Message == "" {
+		t.Fatal("message must not be empty")
+	}
+}
