@@ -47,7 +47,7 @@ func (e *Engine) MaybeSendArbitrage(ctx context.Context, input ArbitrageAlertInp
 	if e.cfg.ArbitrageRThreshold <= 0 || input.ReturnPct < e.cfg.ArbitrageRThreshold {
 		return false, nil
 	}
-	key := fmt.Sprintf("arb:%s:%.0f:%.2f", input.Expiry, input.Strike, input.ReturnPct)
+	key := fmt.Sprintf("arb:%s:%.0f", input.Expiry, input.Strike)
 	return e.send(ctx, "arbitrage", key, fmt.Sprintf("Arbitrage R=%.2f%% strike=%.0f expiry=%s", input.ReturnPct, input.Strike, input.Expiry))
 }
 
