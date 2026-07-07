@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"context"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -15,6 +16,9 @@ import (
 const (
 	symbolHaltDailySyncHour      = 8
 	symbolHaltDailySyncMinute    = 0
+	symbolHaltRefreshInterval    = 5 * time.Minute
+	symbolHaltFetchMaxAttempts   = 3
+	symbolHaltFetchRetryDelay    = 2 * time.Second
 	reopenCheckInterval          = 2 * time.Minute
 	tehranMarketOpenHour         = 9
 	tehranMarketOpenMinute       = 0
@@ -34,13 +38,23 @@ func (s *Service) StartSymbolHaltScheduler(ctx context.Context) {
 
 	go func() {
 		s.syncSymbolHaltsOnce(ctx)
+		dailyTimer := time.NewTimer(time.Until(nextTehranTime(symbolHaltDailySyncHour, symbolHaltDailySyncMinute)))
+		defer dailyTimer.Stop()
+		refreshTicker := time.NewTicker(symbolHaltRefreshInterval)
+		defer refreshTicker.Stop()
 		for {
-			next := nextTehranTime(symbolHaltDailySyncHour, symbolHaltDailySyncMinute)
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(time.Until(next)):
+			case <-dailyTimer.C:
 				s.syncSymbolHaltsOnce(ctx)
+				dailyTimer.Reset(time.Until(nextTehranTime(symbolHaltDailySyncHour, symbolHaltDailySyncMinute)))
+			case <-refreshTicker.C:
+				// The daily sync runs before market open and can miss halts that occur
+				// during the trading session, so keep refreshing while the market is open.
+				if isTehranMarketHours() {
+					s.syncSymbolHaltsOnce(ctx)
+				}
 			}
 		}
 	}()
@@ -65,15 +79,17 @@ func (s *Service) StartSymbolHaltScheduler(ctx context.Context) {
 }
 
 func (s *Service) syncSymbolHaltsOnce(ctx context.Context) {
-	syncCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	syncCtx, cancel := context.WithTimeout(ctx, 150*time.Second)
 	defer cancel()
 
-	closedSymbols, err := s.client.FetchClosedSymbols(syncCtx)
+	closedSymbols, err := s.fetchClosedSymbolsWithRetry(syncCtx)
 	if err != nil {
+		slog.Error("symbol halt sync aborted: fetch closed symbols failed", "error", err)
 		return
 	}
 	supervisorMessages, err := s.client.FetchSupervisorMessages(syncCtx)
 	if err != nil {
+		slog.Warn("symbol halt sync: fetch supervisor messages failed, continuing without them", "error", err)
 		supervisorMessages = nil
 	}
 	latestHalts := latestMessagesBySymbol(supervisorMessages, isHaltSupervisorMessage)
@@ -128,8 +144,37 @@ func (s *Service) syncSymbolHaltsOnce(ctx context.Context) {
 	}
 	events = append(events, supervisorEvents(supervisorMessages)...)
 	sort.Slice(halts, func(i, j int) bool { return halts[i].Name < halts[j].Name })
-	_ = s.haltStore.ReplaceSymbolHalts(syncCtx, time.Now().UTC(), halts)
-	_ = s.haltStore.AppendSymbolHaltEvents(syncCtx, events)
+	if err := s.haltStore.ReplaceSymbolHalts(syncCtx, time.Now().UTC(), halts); err != nil {
+		slog.Error("symbol halt sync: replace halts failed", "error", err)
+		return
+	}
+	if err := s.haltStore.AppendSymbolHaltEvents(syncCtx, events); err != nil {
+		slog.Error("symbol halt sync: append halt events failed", "error", err)
+		return
+	}
+	slog.Info("symbol halt sync complete", "halted_count", len(halts), "event_count", len(events))
+}
+
+// fetchClosedSymbolsWithRetry retries transient failures from the closed_symbols
+// endpoint, which has been observed to intermittently return an error payload.
+func (s *Service) fetchClosedSymbolsWithRetry(ctx context.Context) ([]sourcearena.ClosedSymbol, error) {
+	var lastErr error
+	for attempt := 1; attempt <= symbolHaltFetchMaxAttempts; attempt++ {
+		closed, err := s.client.FetchClosedSymbols(ctx)
+		if err == nil {
+			return closed, nil
+		}
+		lastErr = err
+		slog.Warn("fetch closed symbols failed", "attempt", attempt, "max_attempts", symbolHaltFetchMaxAttempts, "error", err)
+		if attempt < symbolHaltFetchMaxAttempts {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(symbolHaltFetchRetryDelay):
+			}
+		}
+	}
+	return nil, lastErr
 }
 
 func (s *Service) checkReopenAnnouncements(ctx context.Context) {
@@ -140,7 +185,11 @@ func (s *Service) checkReopenAnnouncements(ctx context.Context) {
 	defer cancel()
 
 	_, halts, err := s.haltStore.LatestSymbolHalts(checkCtx)
-	if err != nil || len(halts) == 0 {
+	if err != nil {
+		slog.Error("reopen check: read latest halts failed", "error", err)
+		return
+	}
+	if len(halts) == 0 {
 		return
 	}
 	haltedSet := make(map[string]struct{}, len(halts))
@@ -150,6 +199,7 @@ func (s *Service) checkReopenAnnouncements(ctx context.Context) {
 
 	messages, err := s.client.FetchSupervisorMessages(checkCtx)
 	if err != nil {
+		slog.Error("reopen check: fetch supervisor messages failed", "error", err)
 		return
 	}
 	reopenMessages := latestMessagesBySymbol(messages, isReopenSupervisorMessage)
@@ -172,7 +222,11 @@ func (s *Service) checkReopenAnnouncements(ctx context.Context) {
 			RawMessage: msg.Message,
 		})
 	}
-	_ = s.haltStore.AppendSymbolHaltEvents(checkCtx, events)
+	if len(events) > 0 {
+		if err := s.haltStore.AppendSymbolHaltEvents(checkCtx, events); err != nil {
+			slog.Error("reopen check: append halt events failed", "error", err)
+		}
+	}
 }
 
 func latestMessagesBySymbol(messages []sourcearena.SupervisorMessage, keep func(string) bool) map[string]sourcearena.SupervisorMessage {
