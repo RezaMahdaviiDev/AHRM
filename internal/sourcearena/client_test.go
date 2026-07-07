@@ -72,6 +72,20 @@ func TestClientAPIError(t *testing.T) {
 	}
 }
 
+func TestDecodeClosedSymbolsErrorPayload(t *testing.T) {
+	_, err := sourcearena.DecodeClosedSymbolsForTest([]byte(`{"Error":"request timeout or empty response"}`))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestDecodeSupervisorMessagesErrorPayload(t *testing.T) {
+	_, err := sourcearena.DecodeSupervisorMessagesForTest([]byte(`{"Error":"request timeout or empty response"}`))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
 func TestDecodeOptionsStringNumbers(t *testing.T) {
 	payload := `[{"name":"ضهرم3023","close_price":13500,"close_price_change_percent":"24.56","emal_price":26000,"to_date":"1405/03/27","basis_name":"اهرم","op":"90068","1_sell_volume":"7152","1_buy_volume":"32640691","trade_volume":"12345"}]`
 	opts, err := sourcearena.DecodeOptionsForTest([]byte(payload))

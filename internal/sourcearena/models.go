@@ -340,6 +340,9 @@ func decodeObjectList(raw json.RawMessage) ([]map[string]any, error) {
 	if err := json.Unmarshal(raw, &wrapped); err != nil {
 		return nil, fmt.Errorf("unexpected payload: %w", err)
 	}
+	if msg, ok := wrapped["Error"]; ok {
+		return nil, NewAPIError("sourcearena", 0, strings.Trim(string(msg), `"`))
+	}
 	for _, key := range []string{"data", "results", "items", "list"} {
 		payload, ok := wrapped[key]
 		if !ok {
@@ -362,9 +365,6 @@ func decodeObjectList(raw json.RawMessage) ([]map[string]any, error) {
 			return nested, nil
 		}
 		return []map[string]any{single}, nil
-	}
-	if msg, ok := wrapped["Error"]; ok {
-		return nil, NewAPIError("sourcearena", 0, strings.Trim(string(msg), `"`))
 	}
 	return nil, fmt.Errorf("unexpected payload")
 }
