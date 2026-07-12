@@ -212,15 +212,16 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 	// Skip when Total==0 (market fully closed) or when stats exactly match the most-recent
 	// DB record — SourceArena caches the last trading day's snapshot on holidays, so
 	// identical stats is a reliable signal that no trading occurred today.
-	if isTehranAfter(13, 0) && s.marketStore != nil && hasToday {
-		if today.Total > 0 && !isHolidaySnapshot {
-			_ = s.marketStore.UpsertToday(ctx, today)
-			if s.symbolStore != nil {
-				symRows := market.SymbolRows(symbols)
-				date := time.Now().UTC().Format("2006-01-02")
-				_ = s.symbolStore.UpsertSymbolSnapshot(ctx, date, symRows)
-			}
+	recordToday := isTehranAfter(13, 0) && s.marketStore != nil && hasToday &&
+		today.Total > 0 && !isHolidaySnapshot
+	if recordToday {
+		_ = s.marketStore.UpsertToday(ctx, today)
+		if s.symbolStore != nil {
+			symRows := market.SymbolRows(symbols)
+			date := time.Now().UTC().Format("2006-01-02")
+			_ = s.symbolStore.UpsertSymbolSnapshot(ctx, date, symRows)
 		}
+		history = mergeTodayIntoHistory(history, today)
 	}
 	if len(history) > 0 {
 		if breadth, bErr := s.breadth.Evaluate(history); bErr == nil {
@@ -481,6 +482,23 @@ func nextTehranTime(hour, minute int) time.Time {
 		next = next.Add(24 * time.Hour)
 	}
 	return next
+}
+
+// mergeTodayIntoHistory overlays live post-session stats onto the DB history slice
+// so breadth/advance indicators match what was just persisted.
+func mergeTodayIntoHistory(history []indicators.DailyMarket, today indicators.DailyMarket) []indicators.DailyMarket {
+	todayDate := time.Now().UTC().Format("2006-01-02")
+	if today.Date != "" {
+		todayDate = today.Date
+	}
+	today.Date = todayDate
+	for i := range history {
+		if history[i].Date == todayDate {
+			history[i] = today
+			return history
+		}
+	}
+	return append(history, today)
 }
 
 func isTehranAfter(hour, minute int) bool {
