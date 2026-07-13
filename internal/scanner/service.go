@@ -264,10 +264,34 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 				}
 				days = append(days, map[string]any{"date": d.Date, "p": d.Positive, "n": d.Negative, "t": d.Total, "breadth": bv, "ad": adr})
 			}
+			var sumP, sumN int
+			var meanAD float64
+			for _, d := range window {
+				sumP += d.Positive
+				sumN += d.Negative
+				if d.Negative > 0 {
+					meanAD += float64(d.Positive) / float64(d.Negative)
+				}
+			}
+			if len(window) > 0 {
+				meanAD /= float64(len(window))
+			}
+			aggAD := 0.0
+			if sumN > 0 {
+				aggAD = float64(sumP) / float64(sumN)
+			}
 			payload, _ := json.Marshal(map[string]any{
-				"sessionId": "c949db", "runId": "breadth-check", "hypothesisId": "H1-H5",
-				"location": "scanner/service.go:Refresh", "message": "breadth window computed",
-				"data": map[string]any{"breadthAvg10": snap.Breadth.Average10Day, "adAvg10": snap.AdvanceDecline.Average10Day, "daysInWindow": snap.Breadth.DaysInWindow, "windowDays": days},
+				"sessionId": "c949db", "runId": "post-fix-ad-agg", "hypothesisId": "H-AD",
+				"location": "scanner/service.go:Refresh", "message": "breadth/AD window computed",
+				"data": map[string]any{
+					"breadthAvg10": snap.Breadth.Average10Day,
+					"adAvg10":      snap.AdvanceDecline.Average10Day,
+					"adAlert":      snap.AdvanceDecline.AlertState,
+					"meanOfRatios": meanAD,
+					"aggregateAD":  aggAD,
+					"daysInWindow": snap.Breadth.DaysInWindow,
+					"windowDays":   days,
+				},
 				"timestamp": time.Now().UnixMilli(),
 			})
 			if f, err := os.OpenFile("/root/AHRM/data/debug-c949db.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
