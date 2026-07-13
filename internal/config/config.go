@@ -30,8 +30,10 @@ type AlertsConfig struct {
 	AdvanceHighThreshold    float64
 	AdvanceLowThreshold     float64
 	CoveredCallROIThreshold float64
-	BullSpreadATMThreshold  float64
-	BullSpreadOTMThreshold  float64
+	BullSpreadATMThreshold     float64
+	BullSpreadOTMThreshold     float64
+	BearPutSpreadATMThreshold  float64
+	BearPutSpreadOTMThreshold  float64
 }
 
 type SourceArenaConfig struct {
@@ -117,8 +119,10 @@ func LoadFromEnv() (*Config, error) {
 			AdvanceHighThreshold:    parseFloatEnv("ALERT_ADVANCE_HIGH", 1.4),
 			AdvanceLowThreshold:     parseFloatEnv("ALERT_ADVANCE_LOW", 0.6),
 			CoveredCallROIThreshold: parseFloatEnv("ALERT_COVERED_CALL_ROI_THRESHOLD", 30.0),
-			BullSpreadATMThreshold:  parseFloatEnv("ALERT_BULL_SPREAD_ATM_THRESHOLD", 2.0),
-			BullSpreadOTMThreshold:  parseFloatEnv("ALERT_BULL_SPREAD_OTM_THRESHOLD", 3.0),
+			BullSpreadATMThreshold:     parseFloatEnv("ALERT_BULL_SPREAD_ATM_THRESHOLD", 2.0),
+			BullSpreadOTMThreshold:     parseFloatEnv("ALERT_BULL_SPREAD_OTM_THRESHOLD", 3.0),
+			BearPutSpreadATMThreshold:  parseFloatEnv("ALERT_BEAR_PUT_SPREAD_ATM_THRESHOLD", 1.5),
+			BearPutSpreadOTMThreshold:  parseFloatEnv("ALERT_BEAR_PUT_SPREAD_OTM_THRESHOLD", 3.0),
 		},
 	}
 	return cfg, cfg.Validate()

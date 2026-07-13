@@ -10,6 +10,7 @@ import (
 	"ahrm/internal/alerts"
 	"ahrm/internal/arbitrage"
 	"ahrm/internal/boursecrawl"
+	"ahrm/internal/bearputspread"
 	"ahrm/internal/bullspread"
 	"ahrm/internal/config"
 	"ahrm/internal/coveredcall"
@@ -49,7 +50,8 @@ type Service struct {
 	coveredCallEngine *coveredcall.Engine
 	ivEngine          *ivcalc.Engine
 	hvEngine          *hv.Engine
-	bullSpreadEngine  *bullspread.Engine
+	bullSpreadEngine    *bullspread.Engine
+	bearPutSpreadEngine *bearputspread.Engine
 	breadth           *indicators.BreadthEngine
 	advance           *indicators.AdvanceDeclineEngine
 	matrix            *matrix.Engine
@@ -91,6 +93,8 @@ type Snapshot struct {
 	PutMatrices          []matrix.Matrix                  `json:"put_matrices"`
 	BullSpreadsATM       []bullspread.Spread              `json:"bull_spreads_atm"`
 	BullSpreadsOTM       []bullspread.Spread              `json:"bull_spreads_otm"`
+	BearPutSpreadsATM    []bearputspread.Spread           `json:"bear_put_spreads_atm"`
+	BearPutSpreadsOTM    []bearputspread.Spread           `json:"bear_put_spreads_otm"`
 	PriceChart           []sourcearena.Candle             `json:"price_chart"`
 	Indicators           *sourcearena.TechnicalIndicators `json:"indicators,omitempty"`
 	SymbolRows           []indicators.SymbolRow           `json:"symbol_rows,omitempty"`
@@ -126,7 +130,8 @@ func NewService(cfg *config.Config, client *sourcearena.Client, marketStore mark
 			High: cfg.Alerts.AdvanceHighThreshold,
 			Low:  cfg.Alerts.AdvanceLowThreshold,
 		}),
-		bullSpreadEngine: bullspread.NewEngine(),
+		bullSpreadEngine:    bullspread.NewEngine(),
+		bearPutSpreadEngine: bearputspread.NewEngine(),
 		matrix:           matrix.NewEngine(),
 		matrixRules:      matrixRules,
 		alerts:           alertEngine,
@@ -358,6 +363,8 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		if snap.Underlying.ClosePrice > 0 {
 			snap.BullSpreadsATM = s.bullSpreadEngine.CalculateAll(options, snap.Underlying.ClosePrice, bullspread.ATM)
 			snap.BullSpreadsOTM = s.bullSpreadEngine.CalculateAll(options, snap.Underlying.ClosePrice, bullspread.OTM)
+			snap.BearPutSpreadsATM = s.bearPutSpreadEngine.CalculateAll(options, snap.Underlying.ClosePrice, bearputspread.ATM)
+			snap.BearPutSpreadsOTM = s.bearPutSpreadEngine.CalculateAll(options, snap.Underlying.ClosePrice, bearputspread.OTM)
 			if s.alerts != nil && !isHolidaySnapshot {
 				for _, sp := range snap.BullSpreadsATM {
 					_, _ = s.alerts.MaybeSendBullSpreadBale(ctx, alerts.BullSpreadAlertInput{
@@ -367,6 +374,18 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 				}
 				for _, sp := range snap.BullSpreadsOTM {
 					_, _ = s.alerts.MaybeSendBullSpreadBale(ctx, alerts.BullSpreadAlertInput{
+						K1Symbol: sp.K1Symbol, K2Symbol: sp.K2Symbol,
+						Expiry: sp.Expiry, R: sp.R, Kind: "OTM",
+					})
+				}
+				for _, sp := range snap.BearPutSpreadsATM {
+					_, _ = s.alerts.MaybeSendBearPutSpreadBale(ctx, alerts.BearPutSpreadAlertInput{
+						K1Symbol: sp.K1Symbol, K2Symbol: sp.K2Symbol,
+						Expiry: sp.Expiry, R: sp.R, Kind: "ATM",
+					})
+				}
+				for _, sp := range snap.BearPutSpreadsOTM {
+					_, _ = s.alerts.MaybeSendBearPutSpreadBale(ctx, alerts.BearPutSpreadAlertInput{
 						K1Symbol: sp.K1Symbol, K2Symbol: sp.K2Symbol,
 						Expiry: sp.Expiry, R: sp.R, Kind: "OTM",
 					})

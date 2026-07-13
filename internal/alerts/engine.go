@@ -18,8 +18,10 @@ type Config struct {
 	AdvanceHighThreshold    float64
 	AdvanceLowThreshold     float64
 	CoveredCallROIThreshold float64
-	BullSpreadATMThreshold  float64
-	BullSpreadOTMThreshold  float64
+	BullSpreadATMThreshold     float64
+	BullSpreadOTMThreshold     float64
+	BearPutSpreadATMThreshold  float64
+	BearPutSpreadOTMThreshold  float64
 }
 
 type Engine struct {
@@ -113,6 +115,28 @@ func (e *Engine) MaybeSendBullSpreadBale(ctx context.Context, input BullSpreadAl
 	msg := fmt.Sprintf("📊 بول کال اسپرد (%s)\n%s / %s\nانقضا: %s\nریوارد/ریسک: %.2f",
 		input.Kind, input.K1Symbol, input.K2Symbol, input.Expiry, input.R)
 	return e.send(ctx, "bale_bull_spread", key, msg)
+}
+
+type BearPutSpreadAlertInput struct {
+	K1Symbol string
+	K2Symbol string
+	Expiry   string
+	R        float64
+	Kind     string // "ATM" or "OTM"
+}
+
+func (e *Engine) MaybeSendBearPutSpreadBale(ctx context.Context, input BearPutSpreadAlertInput) (bool, error) {
+	threshold := e.cfg.BearPutSpreadATMThreshold
+	if input.Kind == "OTM" {
+		threshold = e.cfg.BearPutSpreadOTMThreshold
+	}
+	if threshold <= 0 || input.R < threshold {
+		return false, nil
+	}
+	key := fmt.Sprintf("bale-bps:%s:%s:%s", input.Kind, input.Expiry, input.K2Symbol)
+	msg := fmt.Sprintf("📊 بیر پوت اسپرد (%s)\n%s / %s\nانقضا: %s\nریوارد/ریسک: %.2f",
+		input.Kind, input.K1Symbol, input.K2Symbol, input.Expiry, input.R)
+	return e.send(ctx, "bale_bear_put_spread", key, msg)
 }
 
 type SymbolReopenAlertInput struct {
