@@ -75,25 +75,21 @@ func TestAdvanceDeclineNoDecliners(t *testing.T) {
 	}
 }
 
-func TestAdvanceDeclineAverageUsesAggregateNotMeanOfRatios(t *testing.T) {
+func TestAdvanceDeclineAverageIsMeanOfDailyRatios(t *testing.T) {
+	// MVP: «میانگین 10 روزه نسبت نمادهای مثبت به منفی» = mean of daily (P/N).
 	engine := indicators.NewAdvanceDeclineEngine(indicators.Thresholds{High: 1.4, Low: 0.6})
-	// Nine balanced days + one extreme (659/36 ≈ 18) must not push avg to "high"
-	// via mean-of-ratios; aggregate sumP/sumN stays near 1.
-	history := make([]indicators.DailyMarket, 9)
-	for i := range history {
-		history[i] = indicators.DailyMarket{Positive: 350, Negative: 350, Total: 700}
+	history := []indicators.DailyMarket{
+		{Positive: 100, Negative: 100, Total: 200}, // 1.0
+		{Positive: 200, Negative: 50, Total: 250},  // 4.0
 	}
-	history = append(history, indicators.DailyMarket{Positive: 659, Negative: 36, Total: 731})
 	result, err := engine.Evaluate(history)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := float64(350*9+659) / float64(350*9+36)
+	want := (1.0 + 4.0) / 2.0
 	if math.Abs(result.Average10Day-want) > 0.0001 {
-		t.Fatalf("avg=%v want=%v", result.Average10Day, want)
-	}
-	if result.AlertState != "normal" {
-		t.Fatalf("alert=%q (mean-of-ratios would have been high)", result.AlertState)
+		t.Fatalf("avg=%v want=%v (must be mean of ratios, not sumP/sumN=%.4f)",
+			result.Average10Day, want, 300.0/150.0)
 	}
 }
 

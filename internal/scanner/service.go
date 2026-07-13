@@ -264,31 +264,14 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 				}
 				days = append(days, map[string]any{"date": d.Date, "p": d.Positive, "n": d.Negative, "t": d.Total, "breadth": bv, "ad": adr})
 			}
-			var sumP, sumN int
-			var meanAD float64
-			for _, d := range window {
-				sumP += d.Positive
-				sumN += d.Negative
-				if d.Negative > 0 {
-					meanAD += float64(d.Positive) / float64(d.Negative)
-				}
-			}
-			if len(window) > 0 {
-				meanAD /= float64(len(window))
-			}
-			aggAD := 0.0
-			if sumN > 0 {
-				aggAD = float64(sumP) / float64(sumN)
-			}
 			payload, _ := json.Marshal(map[string]any{
-				"sessionId": "c949db", "runId": "post-fix-ad-agg", "hypothesisId": "H-AD",
-				"location": "scanner/service.go:Refresh", "message": "breadth/AD window computed",
+				"sessionId": "c949db", "runId": "mvp-mean-of-ratios", "hypothesisId": "H-MVP",
+				"location": "scanner/service.go:Refresh", "message": "breadth/AD per MVP mean-of-daily-ratios",
 				"data": map[string]any{
 					"breadthAvg10": snap.Breadth.Average10Day,
 					"adAvg10":      snap.AdvanceDecline.Average10Day,
 					"adAlert":      snap.AdvanceDecline.AlertState,
-					"meanOfRatios": meanAD,
-					"aggregateAD":  aggAD,
+					"adToday":      snap.AdvanceDecline.CurrentValue,
 					"daysInWindow": snap.Breadth.DaysInWindow,
 					"windowDays":   days,
 				},

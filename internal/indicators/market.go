@@ -130,35 +130,26 @@ func NewAdvanceDeclineEngine(th Thresholds) *AdvanceDeclineEngine {
 }
 
 func (e *AdvanceDeclineEngine) Evaluate(history []DailyMarket) (IndicatorResult, error) {
-	days := make([]DailyMarket, 0, len(history))
+	values := make([]float64, 0, len(history))
 	for _, day := range history {
 		if day.Total <= 0 {
 			continue
 		}
-		days = append(days, day)
+		v, _ := AdvanceDeclineDailyValue(day)
+		values = append(values, v)
 	}
-	if len(days) == 0 {
+	if len(values) == 0 {
 		return IndicatorResult{}, fmt.Errorf("empty history")
 	}
+	avg, err := AverageLast(values, e.Window)
+	if err != nil {
+		return IndicatorResult{}, err
+	}
+	current := values[len(values)-1]
 	n := e.Window
-	if len(days) < n {
-		n = len(days)
+	if len(values) < n {
+		n = len(values)
 	}
-	window := days[len(days)-n:]
-	var sumPos, sumNeg int
-	for _, day := range window {
-		sumPos += day.Positive
-		sumNeg += day.Negative
-	}
-	// Use aggregate A/D over the window (sum positive / sum negative), not the
-	// arithmetic mean of daily ratios — a single day with few decliners (e.g.
-	// 659/36 → 18) otherwise dominates the 10-day average and false-triggers "high".
-	denom := sumNeg
-	if denom <= 0 {
-		denom = 1
-	}
-	avg := float64(sumPos) / float64(denom)
-	current, _ := AdvanceDeclineDailyValue(days[len(days)-1])
 	return IndicatorResult{
 		CurrentValue: current,
 		Average10Day: avg,
