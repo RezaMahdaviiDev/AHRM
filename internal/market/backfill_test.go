@@ -65,12 +65,29 @@ func TestBackfillHistorySkipsFundSymbols(t *testing.T) {
 	}
 	store := newFakeStore()
 	// nil client means BackfillHistory exits after traded-list building; no panic = filter OK
-	err := BackfillHistory(ctx, nil, symbols, store, nil)
+	err := BackfillHistory(ctx, nil, symbols, store, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(store.days) != 0 {
 		t.Fatalf("expected no days written, got %d", len(store.days))
+	}
+}
+
+func TestBackfillHistoryPreservesSnapshotDays(t *testing.T) {
+	ctx := context.Background()
+	store := newFakeStore()
+	store.set(time.Date(2026, 7, 12, 0, 0, 0, 0, time.UTC), indicators.DailyMarket{
+		Positive: 74, Negative: 602, Total: 707,
+	})
+	preserve := map[string]struct{}{"2026-07-12": {}}
+	err := BackfillHistory(ctx, nil, nil, store, preserve, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := store.days["2026-07-12"]
+	if got.Positive != 74 || got.Negative != 602 || got.Total != 707 {
+		t.Fatalf("snapshot day overwritten: %+v", got)
 	}
 }
 

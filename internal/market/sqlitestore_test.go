@@ -6,8 +6,36 @@ import (
 	"testing"
 	"time"
 
+	"ahrm/internal/indicators"
 	"ahrm/internal/market"
 )
+
+func TestSQLiteStoreExistingSnapshotDays(t *testing.T) {
+	store, err := market.NewSQLiteStore(filepath.Join(t.TempDir(), "market.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	ctx := context.Background()
+	date := "2026-07-13"
+	if err := store.UpsertSymbolSnapshot(ctx, date, []indicators.SymbolRow{
+		{Name: "فملی", ChangePct: 2.1, Status: "positive"},
+		{Name: "خساپا", ChangePct: -1.2, Status: "negative"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	from := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC)
+	got, err := store.ExistingSnapshotDays(ctx, from, to)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got[date]; !ok {
+		t.Fatalf("expected snapshot date %s, got %v", date, got)
+	}
+}
 
 func TestSQLiteStoreSymbolHaltsRoundTrip(t *testing.T) {
 	store, err := market.NewSQLiteStore(filepath.Join(t.TempDir(), "market.db"))

@@ -491,7 +491,16 @@ func (s *Service) runBackfill(ctx context.Context) {
 		}
 		s.bfMu.Unlock()
 	}
-	_ = market.BackfillHistory(bfCtx, s.client, symbols, s.marketStore, onProgress)
+	preserveDates := map[string]struct{}{}
+	if snapStore, ok := s.marketStore.(interface {
+		ExistingSnapshotDays(context.Context, time.Time, time.Time) (map[string]struct{}, error)
+	}); ok {
+		from := time.Now().AddDate(0, 0, -market.BackfillLookbackDays())
+		if dates, err := snapStore.ExistingSnapshotDays(bfCtx, from, time.Now()); err == nil {
+			preserveDates = dates
+		}
+	}
+	_ = market.BackfillHistory(bfCtx, s.client, symbols, s.marketStore, preserveDates, onProgress)
 }
 
 func nextTehranTime(hour, minute int) time.Time {

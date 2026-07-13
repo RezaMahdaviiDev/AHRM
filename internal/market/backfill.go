@@ -30,6 +30,9 @@ const (
 
 type dayAgg struct{ positive, negative, total int }
 
+// BackfillLookbackDays returns the calendar lookback used by BackfillHistory.
+func BackfillLookbackDays() int { return backfillLookbackDays }
+
 // NeedsBackfill reports whether the expensive per-symbol candle backfill should run.
 //
 // In steady state the live market snapshot (ClassifyDay + UpsertToday) appends one row
@@ -67,7 +70,7 @@ func NeedsBackfill(ctx context.Context, store DailyStore) (bool, error) {
 type ProgressFunc func(batch, totalBatches, symbolsDone, totalSymbols int)
 
 func BackfillHistory(ctx context.Context, client *sourcearena.Client,
-	symbols []sourcearena.SymbolQuote, store DailyStore, onProgress ProgressFunc) error {
+	symbols []sourcearena.SymbolQuote, store DailyStore, preserveDates map[string]struct{}, onProgress ProgressFunc) error {
 
 	traded := make([]string, 0, len(symbols))
 	for _, s := range symbols {
@@ -144,6 +147,9 @@ func BackfillHistory(ctx context.Context, client *sourcearena.Client,
 	// Write final accumulated results once all batches are done.
 	daysWritten := 0
 	for dateStr, agg := range allDays {
+		if _, preserve := preserveDates[dateStr]; preserve {
+			continue
+		}
 		t, err := time.Parse("2006-01-02", dateStr)
 		if err != nil {
 			continue

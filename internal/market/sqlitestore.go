@@ -164,6 +164,31 @@ func (s *SQLiteStore) LastDays(ctx context.Context, days int) ([]indicators.Dail
 	return out, nil
 }
 
+// ExistingSnapshotDays returns dates that have a live post-close symbol snapshot.
+// Backfill must not overwrite these rows — candle-based aggregates differ from
+// the ClassifyDay snapshot taken at market close.
+func (s *SQLiteStore) ExistingSnapshotDays(ctx context.Context, from, to time.Time) (map[string]struct{}, error) {
+	fromStr := from.UTC().Format("2006-01-02")
+	toStr := to.UTC().Format("2006-01-02")
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT DISTINCT snapshot_date FROM market_symbol_snapshot
+		WHERE snapshot_date >= ? AND snapshot_date <= ?`, fromStr, toStr)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := map[string]struct{}{}
+	for rows.Next() {
+		var d string
+		if err := rows.Scan(&d); err != nil {
+			return nil, err
+		}
+		out[d] = struct{}{}
+	}
+	return out, rows.Err()
+}
+
 func (s *SQLiteStore) ExistingDays(ctx context.Context, from, to time.Time) (map[string]struct{}, error) {
 	fromStr := from.UTC().Format("2006-01-02")
 	toStr := to.UTC().Format("2006-01-02")
