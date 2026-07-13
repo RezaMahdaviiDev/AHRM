@@ -2,7 +2,9 @@ package scanner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -243,6 +245,37 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 		} else {
 			snap.Errors = append(snap.Errors, fmt.Sprintf("advance_decline: %v", aErr))
 		}
+		// #region agent log
+		if snap.Breadth.DaysInWindow > 0 {
+			n := len(history)
+			start := n - 10
+			if start < 0 {
+				start = 0
+			}
+			window := history[start:]
+			days := make([]map[string]any, 0, len(window))
+			for _, d := range window {
+				bv, adr := 0.0, 0.0
+				if d.Total > 0 {
+					bv = float64(d.Positive) / float64(d.Total)
+				}
+				if d.Negative > 0 {
+					adr = float64(d.Positive) / float64(d.Negative)
+				}
+				days = append(days, map[string]any{"date": d.Date, "p": d.Positive, "n": d.Negative, "t": d.Total, "breadth": bv, "ad": adr})
+			}
+			payload, _ := json.Marshal(map[string]any{
+				"sessionId": "c949db", "runId": "breadth-check", "hypothesisId": "H1-H5",
+				"location": "scanner/service.go:Refresh", "message": "breadth window computed",
+				"data": map[string]any{"breadthAvg10": snap.Breadth.Average10Day, "adAvg10": snap.AdvanceDecline.Average10Day, "daysInWindow": snap.Breadth.DaysInWindow, "windowDays": days},
+				"timestamp": time.Now().UnixMilli(),
+			})
+			if f, err := os.OpenFile("/root/AHRM/data/debug-c949db.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				_, _ = f.Write(append(payload, '\n'))
+				f.Close()
+			}
+		}
+		// #endregion
 		rows := make([]DailyRow, 0, len(history))
 		windowStart := len(history) - 10
 		if windowStart < 0 {
