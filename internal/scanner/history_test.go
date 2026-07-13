@@ -30,3 +30,16 @@ func TestMergeTodayIntoHistory(t *testing.T) {
 		t.Fatalf("replace: last day=%+v", got[2])
 	}
 }
+
+func TestFrozenDayInHistory(t *testing.T) {
+	history := []indicators.DailyMarket{
+		{Date: "2026-07-12", Positive: 413, Negative: 194, Total: 678},
+	}
+	if _, ok := frozenDayInHistory(history, "2026-07-13"); ok {
+		t.Fatal("expected missing day")
+	}
+	got, ok := frozenDayInHistory(history, "2026-07-12")
+	if !ok || got.Positive != 413 {
+		t.Fatalf("got=%+v ok=%v", got, ok)
+	}
+}

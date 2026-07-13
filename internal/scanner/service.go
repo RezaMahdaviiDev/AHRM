@@ -208,23 +208,27 @@ func (s *Service) Refresh(ctx context.Context) (Snapshot, error) {
 	if hasToday {
 		today = market.ClassifyDay(symbols)
 	}
+	todayDate := time.Now().UTC().Format("2006-01-02")
+	if frozen, ok := frozenDayInHistory(history, todayDate); ok {
+		// TSE stock session ends ~13:00; keep first post-close snapshot for the day.
+		today = frozen
+	}
 	isHolidaySnapshot := hasToday && today.Total > 0 && len(history) > 0 &&
 		history[len(history)-1].Positive == today.Positive &&
 		history[len(history)-1].Negative == today.Negative &&
 		history[len(history)-1].Total == today.Total
 
-	// Record today's breadth snapshot after 13:00 Tehran time (post-session data).
-	// Skip when Total==0 (market fully closed) or when stats exactly match the most-recent
-	// DB record — SourceArena caches the last trading day's snapshot on holidays, so
-	// identical stats is a reliable signal that no trading occurred today.
+	// Record once after 13:00 Tehran (stock close). Later refreshes reuse the frozen
+	// DB row so post-close gold/fixed-income API drift cannot change breadth stats.
+	_, alreadyFrozen := frozenDayInHistory(history, todayDate)
 	recordToday := isTehranAfter(13, 0) && s.marketStore != nil && hasToday &&
-		today.Total > 0 && !isHolidaySnapshot
+		today.Total > 0 && !isHolidaySnapshot && !alreadyFrozen
 	if recordToday {
+		today.Date = todayDate
 		_ = s.marketStore.UpsertToday(ctx, today)
 		if s.symbolStore != nil {
 			symRows := market.SymbolRows(symbols)
-			date := time.Now().UTC().Format("2006-01-02")
-			_ = s.symbolStore.UpsertSymbolSnapshot(ctx, date, symRows)
+			_ = s.symbolStore.UpsertSymbolSnapshot(ctx, todayDate, symRows)
 		}
 		history = mergeTodayIntoHistory(history, today)
 	}
@@ -501,6 +505,16 @@ func nextTehranTime(hour, minute int) time.Time {
 		next = next.Add(24 * time.Hour)
 	}
 	return next
+}
+
+
+func frozenDayInHistory(history []indicators.DailyMarket, date string) (indicators.DailyMarket, bool) {
+	for _, d := range history {
+		if d.Date == date {
+			return d, true
+		}
+	}
+	return indicators.DailyMarket{}, false
 }
 
 // mergeTodayIntoHistory overlays live post-session stats onto the DB history slice

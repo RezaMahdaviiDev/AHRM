@@ -120,7 +120,7 @@ _Avoid_: writing it as plain "R" without spread context; sود/ریسک ambiguit
 
 **Daily Market Stats**:
 For one trading day, the count of traded symbols that closed Positive, Negative, or in
-total, across the **Stock Universe** only (see below). Recorded only after 13:00 Tehran
+total, across the **Stock Universe** only (see below). Recorded once after 13:00 Tehran (stock close); frozen for the day
 time. A per-symbol snapshot (name, change %, status) is also persisted at the same time
 and displayed as the Symbol Detail table on the `/market` page. The price basis for
 classification is **قیمت پایانی** (weighted average closing price, `final_price_change_percent`

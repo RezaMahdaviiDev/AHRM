@@ -111,7 +111,7 @@ func (e *Engine) MaybeSendBullSpreadBale(ctx context.Context, input BullSpreadAl
 	if threshold <= 0 || input.R < threshold {
 		return false, nil
 	}
-	key := fmt.Sprintf("bale-bs:%s:%s:%s", input.Kind, input.Expiry, input.K2Symbol)
+	key := fmt.Sprintf("bale-bs:%s:%s:%s:%s", input.Kind, input.Expiry, input.K1Symbol, input.K2Symbol)
 	msg := fmt.Sprintf("📊 بول کال اسپرد (%s)\n%s / %s\nانقضا: %s\nریوارد/ریسک: %.2f",
 		input.Kind, input.K1Symbol, input.K2Symbol, input.Expiry, input.R)
 	return e.send(ctx, "bale_bull_spread", key, msg)
@@ -133,7 +133,7 @@ func (e *Engine) MaybeSendBearPutSpreadBale(ctx context.Context, input BearPutSp
 	if threshold <= 0 || input.R < threshold {
 		return false, nil
 	}
-	key := fmt.Sprintf("bale-bps:%s:%s:%s", input.Kind, input.Expiry, input.K2Symbol)
+	key := fmt.Sprintf("bale-bps:%s:%s:%s:%s", input.Kind, input.Expiry, input.K1Symbol, input.K2Symbol)
 	msg := fmt.Sprintf("📊 بیر پوت اسپرد (%s)\n%s / %s\nانقضا: %s\nریوارد/ریسک: %.2f",
 		input.Kind, input.K1Symbol, input.K2Symbol, input.Expiry, input.R)
 	return e.send(ctx, "bale_bear_put_spread", key, msg)
@@ -167,18 +167,16 @@ func (e *Engine) send(ctx context.Context, alertType, key, message string) (bool
 	if e.sender == nil {
 		return false, fmt.Errorf("sender not configured")
 	}
-	sent, err := e.store.WasSent(ctx, alertType, key)
+	payload, _ := json.Marshal(map[string]string{"message": message})
+	claimed, err := e.store.TryClaim(ctx, alertType, key, payload)
 	if err != nil {
 		return false, err
 	}
-	if sent {
+	if !claimed {
 		return false, nil
 	}
 	if err := e.sender.SendMessage(ctx, message); err != nil {
-		return false, err
-	}
-	payload, _ := json.Marshal(map[string]string{"message": message})
-	if err := e.store.Record(ctx, alertType, key, payload); err != nil {
+		_ = e.store.Release(ctx, alertType, key)
 		return false, err
 	}
 	if e.onAlert != nil {

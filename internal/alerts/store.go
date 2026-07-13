@@ -17,6 +17,9 @@ import (
 type AlertStore interface {
 	WasSent(ctx context.Context, alertType, key string) (bool, error)
 	Record(ctx context.Context, alertType, key string, payload []byte) error
+	// TryClaim atomically reserves an alert slot (24h dedup). Returns true if this caller won.
+	TryClaim(ctx context.Context, alertType, key string, payload []byte) (bool, error)
+	Release(ctx context.Context, alertType, key string) error
 }
 
 // SQLiteStore persists alert history in a local SQLite file.
@@ -78,6 +81,41 @@ func (s *SQLiteStore) Record(_ context.Context, alertType, key string, payload [
 		alertType, digest, string(payload), time.Now().UTC().Format("2006-01-02 15:04:05"),
 	)
 	return err
+}
+
+
+func (s *SQLiteStore) Release(_ context.Context, alertType, key string) error {
+	digest := hashKey(alertType + ":" + key)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := s.db.Exec(`DELETE FROM alert_history WHERE alert_type = ? AND alert_key = ?`, alertType, digest)
+	return err
+}
+
+func (s *SQLiteStore) TryClaim(_ context.Context, alertType, key string, payload []byte) (bool, error) {
+	digest := hashKey(alertType + ":" + key)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var count int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM alert_history WHERE alert_type = ? AND alert_key = ? AND sent_at > datetime('now', '-24 hours')`,
+		alertType, digest,
+	).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return false, nil
+	}
+	res, err := s.db.Exec(
+		`INSERT INTO alert_history (alert_type, alert_key, payload, sent_at) VALUES (?, ?, ?, ?)`,
+		alertType, digest, string(payload), time.Now().UTC().Format("2006-01-02 15:04:05"),
+	)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
 }
 
 // NewMemStore returns an in-memory AlertStore with no persistence. Intended for tests only.
