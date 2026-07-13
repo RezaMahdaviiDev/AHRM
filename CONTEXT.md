@@ -105,10 +105,16 @@ A bull call spread — long a lower-Strike Call (K1), short a higher-Strike Call
 Expiry — surfaced in ATM and OTM variants.
 _Avoid_: vertical spread, debit spread (use Bull Spread); reusing arbitrage terms here
 
+**Bear Put Spread**:
+A bear put spread — long a higher-Strike Put (K1), short a lower-Strike Put (K2), same
+Expiry — surfaced in ATM and OTM variants.
+_Avoid_: vertical spread, debit spread (use Bear Put Spread); reusing Bull Spread without
+qualifying put/bear direction
+
 **Reward-to-Risk (R)**:
-A Bull Spread's max profit divided by its debit. Distinct from the arbitrage Return even
-though both are written "R".
-_Avoid_: writing it as plain "R" without "Bull Spread" context; sود/ریسک ambiguity
+A Bull or Bear Put Spread's max profit divided by its debit. Distinct from the arbitrage
+Return even though both are written "R".
+_Avoid_: writing it as plain "R" without spread context; sود/ریسک ambiguity
 
 ## Market Breadth
 

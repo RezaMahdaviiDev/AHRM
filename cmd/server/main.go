@@ -59,8 +59,10 @@ func main() {
 		AdvanceHighThreshold:    cfg.Alerts.AdvanceHighThreshold,
 		AdvanceLowThreshold:     cfg.Alerts.AdvanceLowThreshold,
 		CoveredCallROIThreshold: cfg.Alerts.CoveredCallROIThreshold,
-		BullSpreadATMThreshold:  cfg.Alerts.BullSpreadATMThreshold,
-		BullSpreadOTMThreshold:  cfg.Alerts.BullSpreadOTMThreshold,
+		BullSpreadATMThreshold:     cfg.Alerts.BullSpreadATMThreshold,
+		BullSpreadOTMThreshold:     cfg.Alerts.BullSpreadOTMThreshold,
+		BearPutSpreadATMThreshold:  cfg.Alerts.BearPutSpreadATMThreshold,
+		BearPutSpreadOTMThreshold:  cfg.Alerts.BearPutSpreadOTMThreshold,
 	}, baleSender, alertStore)
 
 	sqliteStore, err := market.NewSQLiteStore(filepath.Join(projectRoot(), "data", "market.db"))
